@@ -7,16 +7,7 @@ using UnityEngine;
 [Serializable]
 public class ItemBase : ScriptableObject
 {
-    public enum Type
-    {
-        HPRecovery,
-        MPRecovery,
-        PoisonRecovery,
-        NumbnessRecovery,
-        Weapon,
-        Armor,
-        Valuables
-    }
+    
 
     //　アイテムの種類
     [SerializeField]
@@ -64,3 +55,14 @@ public class ItemBase : ScriptableObject
 
     }
 }
+
+public enum Type
+    {
+        HPRecovery,
+        MPRecovery,
+        PoisonRecovery,
+        NumbnessRecovery,
+        Weapon,
+        Armor,
+        Valuables
+    }

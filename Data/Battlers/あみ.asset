@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67180253f9437da4f99ccdfa4a030ff8, type: 3}
+  m_Name: "\u3042\u307F"
+  m_EditorClassIdentifier: 
+  name: "\u3042\u307F"
+  maxHP: 9
+  maxMP: 10
+  at: 2.5
+  inte: 3
+  def: 2.5
+  mnd: 4
+  sprite: {fileID: -1905210172, guid: a87fb7c6be0297646be16070b3cbd38c, type: 3}
+  learnableMoves:
+  - moveBase: {fileID: 11400000, guid: dcdadaef462b735488f0b8fe3d52e1a5, type: 2}
+    level: 1
+  - moveBase: {fileID: 11400000, guid: e48d9b34642da4443b1a639bcdb406b8, type: 2}
+    level: 1
+  - moveBase: {fileID: 11400000, guid: 8703d2b07dbac074098713dc2eae7bc6, type: 2}
+    level: 1
+  exp: 2000
+  gold: 10000
+  dropItem1:
+    dropItem:
+      _base: {fileID: 11400000, guid: 302d5f09176a8d0469afbc41d0e972c5, type: 2}
+    chance: 100
+  dropItem2:
+    dropItem:
+      _base: {fileID: 11400000, guid: c84857d546771284784b4992ba6c5b25, type: 2}
+    chance: 100
+  equipWeapon:
+    _base: {fileID: 11400000, guid: 579abf77b58c57448880ce7ab6ad9e4e, type: 2}
+  equipArmor:
+    _base: {fileID: 11400000, guid: d629bdbef7a603846add091c5bd9e2ed, type: 2}
+  equipAccessory:
+    _base: {fileID: 11400000, guid: e38d0bedb3128c24a911aa2c98362d75, type: 2}

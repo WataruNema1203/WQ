@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 67180253f9437da4f99ccdfa4a030ff8, type: 3}
+  m_Name: "\u30A2\u30DF\u30CA"
+  m_EditorClassIdentifier: 
+  name: "\u30A2\u30DF\u30CA"
+  maxHP: 10
+  maxMP: 10
+  at: 4
+  inte: 4
+  def: 4
+  mnd: 4
+  sprite: {fileID: -329276199, guid: 8a19ace977a952144b6635595c931906, type: 3}
+  learnableMoves:
+  - moveBase: {fileID: 11400000, guid: aa8e5ff7cb361054caf8bafacde37d9d, type: 2}
+    level: 1
+  - moveBase: {fileID: 11400000, guid: 392b008221dd0814ea21b6a4d235e1bd, type: 2}
+    level: 1
+  - moveBase: {fileID: 11400000, guid: 9d632867d0ee4b649ba7e2b491d1db30, type: 2}
+    level: 10
+  - moveBase: {fileID: 11400000, guid: 8703d2b07dbac074098713dc2eae7bc6, type: 2}
+    level: 1
+  exp: 0
+  gold: 0
+  dropItem1:
+    dropItem:
+      _base: {fileID: 0}
+    chance: 0
+  dropItem2:
+    dropItem:
+      _base: {fileID: 0}
+    chance: 0
+  equipWeapon:
+    _base: {fileID: 11400000, guid: 5bb1552e470776d45b3d53dcd6029d3b, type: 2}
+  equipArmor:
+    _base: {fileID: 11400000, guid: 7943dd09547f24a47ba20e0b0f6c4dfc, type: 2}
+  equipAccessory:
+    _base: {fileID: 11400000, guid: e38d0bedb3128c24a911aa2c98362d75, type: 2}

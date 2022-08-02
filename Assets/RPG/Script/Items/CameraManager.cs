@@ -26,6 +26,6 @@ public class CameraManager : MonoBehaviour
         vector3.z = defaultPosition.z;
         vector3.x = Mathf.Clamp(vector3.x, min.x, max.x);
         vector3.y = Mathf.Clamp(vector3.y, min.y, max.y);
-        transform.position = Vector3.MoveTowards(transform.position, vector3, Time.deltaTime*5);
+        transform.position = Vector3.MoveTowards(transform.position, vector3, Time.deltaTime * 5);
     }
 }

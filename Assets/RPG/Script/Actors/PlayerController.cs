@@ -41,7 +41,7 @@ public class PlayerController : MonoBehaviour
 
     public void HandleUpdate()
     {
-        if (!isMoving&&!isSelect)
+        if (!isMoving && !isSelect)
         {
             input.x = Input.GetAxisRaw("Horizontal");
             input.y = Input.GetAxisRaw("Vertical");
@@ -61,7 +61,7 @@ public class PlayerController : MonoBehaviour
         }
         animator.SetBool("IsMoving", isMoving);
 
-        if (Input.GetKeyDown(KeyCode.Z))
+        if (Input.GetKeyDown(KeyCode.Z) && !isSelect)
         {
             Interact();
         }
@@ -128,6 +128,7 @@ public class PlayerController : MonoBehaviour
         Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.3f, GameLayers.Instance.InteractableLayer);
         if (collider2D)
         {
+            isSelect = true;
             collider2D.GetComponent<IInteract>().Interact(transform);
         }
 
@@ -143,6 +144,7 @@ public class PlayerController : MonoBehaviour
         Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.3f, GameLayers.Instance.StoryLayer);
         if (collider2D)
         {
+            isSelect = true;
             collider2D.GetComponent<IInteract>().Interact(transform);
         }
 

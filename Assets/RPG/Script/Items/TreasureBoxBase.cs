@@ -39,6 +39,7 @@ public class TreasureBoxBase: MonoBehaviour, IInteract
         yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
         player.StartPlayer();
         dialog.SetActive(false);
+        Destroy(gameObject);
     }
 
     public void LookToward()

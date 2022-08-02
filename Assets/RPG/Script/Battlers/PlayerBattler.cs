@@ -27,7 +27,7 @@ public class PlayerBattler : BattlerBase
         this.equipWeapon = weaponItem;
     }
 
-    public ItemBase GetEquipWeapon()
+    public new ItemBase GetEquipWeapon()
     {
         return equipWeapon;
     }
@@ -37,7 +37,7 @@ public class PlayerBattler : BattlerBase
         this.equipArmor = armorItem;
     }
 
-    public ItemBase GetEquipArmor()
+    public new ItemBase GetEquipArmor()
     {
         return equipArmor;
     }

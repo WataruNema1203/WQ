@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
 [Serializable]
@@ -15,6 +16,7 @@ public class Battler
     public BattlerBase Base { get => _base; }
     public int Level { get => level; }
     public int HasExp { get; set; }
+    public int Gold { get; set; }
     public int HP { get; set; }
     public int MP { get; set; }
     public int Value { get; set; }
@@ -45,6 +47,7 @@ public class Battler
     //バトル終了時に回復する：Statusと同じように設定する
     public Condition VolatileStatus { get; private set; }
     public int VolatileStatusTime { get; set; }
+
 
 
     readonly Dictionary<Stat, string> statDic = new Dictionary<Stat, string>()
@@ -95,13 +98,13 @@ public class Battler
         Stats = new Dictionary<Stat, int>
         {
             //ステータス変化してない初期値を入れていく
-            { Stat.Attack, Mathf.FloorToInt((Base.At * Level) / 100f) + 5},
-            { Stat.Defense, Mathf.FloorToInt((Base.Def * Level) / 100f) + 5 },
-            {Stat.Intelligence, Mathf.FloorToInt((Base.Inte * Level) / 100f) + 5 },
-            {Stat.Mind, Mathf.FloorToInt((Base.Mid * Level) / 100f) + 5 }
+            { Stat.Attack, Mathf.FloorToInt(Base.At * Level)+5},
+            { Stat.Defense, Mathf.FloorToInt(Base.Def * Level) + 5 },
+            {Stat.Intelligence, Mathf.FloorToInt(Base.Inte * Level) + 5 },
+            {Stat.Mind, Mathf.FloorToInt(Base.Mid * Level) + 5 }
         };
-        MaxHP = Mathf.FloorToInt((Base.MaxHP * Level) / 100f) + 10 + Level;
-        MaxMP = Mathf.FloorToInt((Base.MaxMP * Level) / 100f) + 10 + Level;
+        MaxHP = Mathf.FloorToInt(Base.MaxHP * Level) + 10 + Level;
+        MaxMP = Mathf.FloorToInt(Base.MaxMP * Level)+ 10 + Level;
     }
 
     int GetStat(Stat stat)
@@ -170,7 +173,6 @@ public class Battler
 
     public DamageDetailes TakeDamage(Move move, Battler attacker, Battler target)
     {
-        //特殊技の場合の修正
         float attack = attacker.Attack;
         float defense = Defense;
 
@@ -192,53 +194,115 @@ public class Battler
             Critical = critical,
         };
 
-        int damage;
-        float modifiers = UnityEngine.Random.Range(0.85f, 1f) * critical;
+        int damage = 0;
+        int modfil = UnityEngine.Random.Range(0, 3);
+        int mod = UnityEngine.Random.Range(0, 2);
 
-        float a = (2 * attacker.Level + 10) / 250f;
-        float d = a * move.Base.Power * (attack / defense) + 2;
-        damage = Mathf.FloorToInt(d * modifiers);
-        HP = Mathf.Clamp(HP - damage, 0, MaxHP);
-
-        if (move.Base.Category1 == MoveCategory1.Heal)
+        //攻撃力÷2－守備力÷4＝ダメージ基礎値
+        //ダメージ基礎値 ÷16＋1（端数切捨）
+        float a = (((attack + (float)attacker.Base.GetEquipWeapon().Base.GetAmount()) / 2) - ((defense + (float)target.Base.GetEquipArmor().Base.GetAmount()) / 4)) * ((float)move.Base.Power / 100) * critical;
+        float b = a / 16 + 1;
+        if (move.Base.Category1 == MoveCategory1.Skill)
         {
-            resultText = move.Base.RunMoveResult(attacker, target, damage);
-            return damageDetailes;
+            a = (((attack + (float)attacker.Base.GetEquipWeapon().Base.GetMagicAmount()) / 2) - ((defense + (float)target.Base.GetEquipArmor().Base.GetMagicAmount()) / 4)) * ((float)move.Base.Power / 100) * critical;
+            b = a / 16 + 1;
         }
-        resultText = move.Base.RunMoveResult(attacker, target, damage);
+
+        if (modfil == 0)
+        {
+            damage = Mathf.FloorToInt(a - b);
+        }
+        else if (modfil == 1)
+        {
+            damage = Mathf.FloorToInt(a);
+        }
+        else if (modfil == 2)
+        {
+            damage = Mathf.FloorToInt(a + b);
+        }
+        if (damage <= 0)
+        {
+            if (mod == 0)
+            {
+                resultText = $"{attacker.Base.Name}は攻撃を外した！";
+
+            }
+            else if (mod == 1)
+            {
+                damage = 1;
+
+                HP = Mathf.Clamp(HP - damage, 0, MaxHP);
+                resultText = move.Base.RunMoveResult(attacker, target, damage);
+            }
+        }
+        else
+        {
+            HP = Mathf.Clamp(HP - damage, 0, MaxHP);
+            resultText = move.Base.RunMoveResult(attacker, target, damage);
+        }
         return damageDetailes;
     }
-    //public DamageDetailes NoMPTakeDamage(int noMpPower, Battler attacker, Battler target)
-    //{
-    //    //クリティカル
-    //    float critical = 1f;
-    //    //6.25%でクリティカル
-    //    if (UnityEngine.Random.value * 100 <= 6.25f)
-    //    {
-    //        critical = 2f;
-    //    }
-    //    DamageDetailes damageDetailes = new DamageDetailes
-    //    {
-    //        Fainted = false,
-    //        Critical = critical,
-    //    };
 
-    //    //特殊技の場合の修正
-    //    float attack = attacker.Attack;
-    //    float defense = Defense;
+    public DamageDetailes NormalAttackTakeDamage(Battler attacker, Battler target)
+    {
+        float attack = attacker.Attack;
+        float defense = Defense;
 
-    //    float modifiers = UnityEngine.Random.Range(0.85f, 1f) * critical;
-    //    float a = (2 * attacker.Level + 10) / 250f;
-    //    float d = a * noMpPower * (attack+attacker.GetEquipWeapon().GetEqipAmount() / defense+target.GetEquipArmor().GetEqipAmount()) + 2;
-    //    int damage = Mathf.FloorToInt(d * modifiers);
-    //    HP = Mathf.Clamp(HP - damage, 0, MaxHP);
-    //    resultText =$"{attacker.Base.Name}の通常攻撃\n{target.Base.Name}は{damage}のダメージ";
-    //    return damageDetailes;
+        //クリティカル
+        float critical = 1f;
+        //6.25%でクリティカル
+        if (UnityEngine.Random.value * 100 <= 6.25f)
+        {
+            critical = 2f;
+        }
+        DamageDetailes damageDetailes = new DamageDetailes
+        {
+            Fainted = false,
+            Critical = critical,
+        };
 
-    //}
+        int damage = 0;
+        int modfil = UnityEngine.Random.Range(0, 2);
+        int mod = UnityEngine.Random.Range(0, 1);
 
+        //攻撃力÷2－守備力÷4＝ダメージ基礎値
+        //ダメージ基礎値 ÷16＋1（端数切捨）
+        float a = (((attack + (float)attacker.Base.GetEquipWeapon().Base.GetAmount()) / 2) - ((defense + (float)target.Base.GetEquipArmor().Base.GetAmount()) / 4))  * critical;
+        float b = a / 16 + 1;
+        if (modfil == 0)
+        {
+            damage = Mathf.FloorToInt(a - b);
+        }
+        else if (modfil == 1)
+        {
+            damage = Mathf.FloorToInt(a);
+        }
+        else if (modfil == 2)
+        {
+            damage = Mathf.FloorToInt(a + b);
+        }
+        if (damage <= 0)
+        {
+            if (mod == 0)
+            {
+                resultText = $"{attacker.Base.Name}は攻撃を外した！";
 
+            }
+            else if (mod == 1)
+            {
+                damage = 1;
 
+                HP = Mathf.Clamp(HP - damage, 0, MaxHP);
+                resultText = $"{attacker.Base.Name}の通常攻撃\n{target.Base.Name}は{damage}のダメージ";
+            }
+        }
+        else
+        {
+            HP = Mathf.Clamp(HP - damage, 0, MaxHP);
+            resultText = $"{attacker.Base.Name}の通常攻撃\n{target.Base.Name}は{damage}のダメージ";
+        }
+        return damageDetailes;
+    }
 
     public void Heal(int healPoint)
     {
@@ -249,6 +313,7 @@ public class Battler
     {
         int r = UnityEngine.Random.Range(0, Moves.Count);
         return Moves[r];
+        //ここがエラーになったら大体敵が技を覚えてない（レベルを下げたせいで忘れてる）
     }
 
     public bool IsLevelUp(BattleUnit playerUnit)

@@ -8,5 +8,5 @@ public class Item
 {
     [SerializeField] ItemBase _base;
 
-    public ItemBase Base { get => _base; }
+    public ItemBase Base { get => _base;}
 }

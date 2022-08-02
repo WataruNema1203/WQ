@@ -2,16 +2,18 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ActionSelectionUI: MonoBehaviour
+public class MenuSelectionUI : MonoBehaviour
 {
-    //アクションUIの管理
-    //たたかうorにげるのどちらを選択中かを把握して色を変える
+    //メニュUIの管理
 
+    //選択肢をUIに反映
+    //何をを選択中かを把握して色を変える
     SelectableText[] selectableTexts;
+
 
     int selectedIndex = 0; //0:たたかう 1:にげる　を選択している
 
-    public int SelectedIndex { get => selectedIndex;}
+    public int SelectedIndex { get => selectedIndex; }
 
     public void Init()
     {
@@ -19,16 +21,19 @@ public class ActionSelectionUI: MonoBehaviour
         selectableTexts = GetComponentsInChildren<SelectableText>();
     }
 
+
     public void HandleUpdate()
     {
         if (Input.GetKeyDown(KeyCode.DownArrow))
         {
             selectedIndex++;
         }
-        else if(Input.GetKeyDown(KeyCode.UpArrow))
+        else if (Input.GetKeyDown(KeyCode.UpArrow))
         {
             selectedIndex--;
         }
+        selectedIndex = Mathf.Clamp(selectedIndex, 0, 4);
+
         for (int i = 0; i < selectableTexts.Length; i++)
         {
             if (selectedIndex == i)
@@ -40,14 +45,12 @@ public class ActionSelectionUI: MonoBehaviour
                 selectableTexts[i].SetSelectedColor(false);
             }
         }
-        selectedIndex = Mathf.Clamp(selectedIndex, 0, 3);
     }
 
     public void Open()
     {
         gameObject.SetActive(true);
     }
-
     public void Close()
     {
         gameObject.SetActive(false);

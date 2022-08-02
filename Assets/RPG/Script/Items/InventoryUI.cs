@@ -3,103 +3,342 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using System.Linq;
+using System;
+enum ItemStatus
+{
+    CharaSelect,
+    ItemTypeSelect,
+    ItemSelect,
+    ItemUseCharaSelect,
+}
 
 public class InventoryUI : MonoBehaviour
 {
-    [SerializeField] Inventory inventory;
-    [SerializeField] GameObject itemPrefabs;
-    [SerializeField] PlayerController player;
+    [SerializeField] ItemInventory inventory;
     [SerializeField] GameObject descriptionPanel;
-    [SerializeField] GameObject inventoryPanel;
-    [SerializeField] Text descriptionText;
+    [SerializeField] GameObject itemCharaPanel;
+    [SerializeField] GameObject itemTypePanel;
+    [SerializeField] GameObject itemPanel;
+    [SerializeField] GameObject itemUseCharaPanel;
+    [SerializeField] InventoryStatusUI inventoryStatusUI;
+    [SerializeField] Text informationText;
+    [SerializeField] Text informationValueText;
+    [SerializeField] PlayerController player;
     public UnityAction OnUsedItem;
+    public UnityAction OnSelectStart;
+    public UnityAction<Item> OnEquip;
+    public UnityAction OnUsedItemKeep;
     ItemUI[] itemSlots;
-    ItemBase @base;
-    
-    
+    ItemCharaUI[] itemCharas;
+    ItemTypeUI[] itemTypes;
+    ItemUseCharaUI[] itemUses;
+    int selectedChara;
+    int selectedItemType;
+    int selectedItem;
+    int selectedItemUseChara;
+    ItemStatus state;
 
-    int selectedIndex;
+    public int SelectedItemType { get => selectedItemType; }
+    public int SelectedItem { get => selectedItem; }
+    public ItemInventory Inventory { get => inventory; }
+    internal ItemStatus State { get => state; }
+    public int SelectedItemUseChara { get => selectedItemUseChara; }
+    public int SelectedChara { get => selectedChara; set => selectedChara = value; }
 
-    public int SelectedIndex { get => selectedIndex; }
-
-    public void Init()
+    public void ItemCharaInit()
     {
-        selectedIndex = 0;
-       itemSlots = GetComponentsInChildren<ItemUI>();
-        Show();
+        selectedChara = 0;
+        itemCharas = GetComponentsInChildren<ItemCharaUI>();
+
+        ItemCharaShow();
     }
 
-    void Show()
+    public void ItemTypeInit()
     {
-        for (int i = 0; i < itemSlots.Length; i++)
-        {
-            if (inventory.Items.Count <= i || inventory.Items[i] == null || inventory.Items[i].item.Base == null)
-            {
-                itemSlots[i].SetText("-");
-                itemSlots[i].transform.Find("PosessionText").GetComponent<Text>().text = "";
-            }
-            else
-            {
-                    itemSlots[i].SetText($"{inventory.Items[i].item.Base.GetKanjiName()}");
-                    itemSlots[i].transform.Find("PosessionText").GetComponent<Text>().text = "× " + $"{inventory.Items[i].posession}";
-            }
-        }
+        selectedItemType = 0;
+        itemTypes = GetComponentsInChildren<ItemTypeUI>();
+
+        ItemTypeShow();
     }
-    //void Show()
-    //{
-    //    foreach (var item in player.GetItemDictionary().Keys)
-    //    {
-    //        itemPrefabs = Instantiate(itemPrefabs, inventoryPanel.transform);
-    //        itemPrefabs.GetComponent<Text>().text = item.GetKanjiName();
-    //        itemPrefabs.transform.Find("PosessionText").GetComponent<Text>().text = "× " + $"{player.GetItemNum(item).ToString()}";
-    //         Debug.Log("test");
 
-    //    }
-    //}
-
-    public void HandleUpdateItemSelection()
+    public void ItemInit()
     {
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
-            selectedIndex-=2;
-        }
-        else if (Input.GetKeyDown(KeyCode.DownArrow))
-        {
-            selectedIndex+=2;
-        }
-        else if (Input.GetKeyDown(KeyCode.LeftArrow))
-        {
-            selectedIndex--;
-        }
-        else if (Input.GetKeyDown(KeyCode.RightArrow))
-        {
-            selectedIndex++;
-        }
+        selectedItem = 0;
+        itemSlots = GetComponentsInChildren<ItemUI>();
 
-        selectedIndex = Mathf.Clamp(selectedIndex, 0, itemSlots.Length-1);
+        ItemShow();
+    }
+    public void ItemUseInit()
+    {
+        selectedItemUseChara = 0;
+        itemUses = GetComponentsInChildren<ItemUseCharaUI>();
 
-        for (int i = 0; i < itemSlots.Length; i++)
+        ItemUseCharaShow();
+    }
+
+    void ItemCharaShow()
+    {
+        for (int i = 0; i < itemCharas.Length; i++)
         {
-            bool selected = selectedIndex == i;
-            if (selected)
+            if (i == 0)
             {
-                if (CanSelectedItem())
+                itemCharas[i].SetText("主人公");
+            }
+            else if (i == 1)
+            {
+                if (player.Battlers.Count == 2)
                 {
-                    descriptionPanel.SetActive(true);
-                    descriptionText.text = inventory.Items[i].item.Base.GetInformation();
+                    itemCharas[i].SetText("アミナ");
                 }
                 else
                 {
-                    descriptionPanel.SetActive(false);
+                    itemCharas[i].SetText("-");
                 }
             }
-            itemSlots[i].SetSelectedColor(selected);
+
         }
+    }
+    void ItemTypeShow()
+    {
+        for (int i = 0; i < itemTypes.Length; i++)
+        {
+            if (i == 0)
+            {
+                itemTypes[i].SetText("消費アイテム");
+            }
+            else if (i == 1)
+            {
+                itemTypes[i].SetText("装備");
+            }
+            else if (i == 2)
+            {
+                itemTypes[i].SetText("大切なもの");
+            }
+        }
+    }
+    void ItemShow()
+    {
+        for (int i = 0; i < itemSlots.Length; i++)
+        {
+            if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetKanjiName() == "未所持")
+            {
+
+                itemSlots[i].SetText("-");
+                itemSlots[i].transform.Find("PosessionText").GetComponent<Text>().text = "";
+            }
+            else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetKanjiName() != "未所持")
+            {
+                itemSlots[i].SetText($"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetKanjiName()}");
+                itemSlots[i].transform.Find("PosessionText").GetComponent<Text>().text = "× " + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].possession}";
+            }
+
+        }
+    }
+    void ItemUseCharaShow()
+    {
+        for (int i = 0; i < itemUses.Length; i++)
+        {
+            if (i == 0)
+            {
+                itemUses[i].SetText("主人公");
+            }
+            else if (i == 1)
+            {
+                if (player.Battlers.Count == 2)
+                {
+                    itemUses[i].SetText("アミナ");
+                }
+                else
+                {
+                    itemUses[i].SetText("-");
+                }
+            }
+
+        }
+    }
+
+    public void HandleUpdateItemSelection()
+    {
+        if (state == ItemStatus.CharaSelect)
+        {
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (selectedChara == 0)
+                {
+                    selectedChara++;
+                }
+                else
+                {
+                    selectedChara--;
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (selectedChara == 1)
+                {
+                    selectedChara--;
+                }
+                else
+                {
+                    selectedChara++;
+                }
+            }
+
+            selectedChara = Mathf.Clamp(selectedChara, 0, 1);
+
+            for (int i = 0; i < itemCharas.Length; i++)
+            {
+                bool selected = SelectedChara == i;
+                itemCharas[i].SetSelectedColor(selected);
+            }
+        }
+        else if (state == ItemStatus.ItemTypeSelect)
+        {
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                selectedItemType--;
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                selectedItemType++;
+            }
+            selectedItemType = Mathf.Clamp(selectedItemType, 0, 2);
+            for (int i = 0; i < itemTypes.Length; i++)
+            {
+                bool selected = selectedItemType == i;
+                itemTypes[i].SetSelectedColor(selected);
+            }
+
+        }
+        else if (state == ItemStatus.ItemSelect)
+        {
+
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (selectedItem == 0 || selectedItem == 1)
+                {
+                    selectedItem += 8;
+                }
+                else
+                {
+                    selectedItem -= 2;
+
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (selectedItem == 8 || selectedItem == 9)
+                {
+                    selectedItem -= 8;
+                }
+                else
+                {
+                    selectedItem += 2;
+
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                if (selectedItem == 0)
+                {
+                    selectedItem += 9;
+                }
+                else
+                {
+                    selectedItem--;
+
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                if (selectedItem == 9)
+                {
+                    selectedItem -= 9;
+                }
+                else
+                {
+                    selectedItem++;
+
+                }
+            }
+
+            selectedItem = Mathf.Clamp(selectedItem, 0, itemSlots.Length - 1);
+
+            for (int i = 0; i < itemSlots.Length; i++)
+            {
+                bool selected = selectedItem == i;
+                if (selected)
+                {
+                    if (CanSelectedItem())
+                    {
+                        descriptionPanel.SetActive(true);
+                        if (selectedItemType == 1)
+                        {
+                            if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetItemType() == Type.Weapon)
+                            {
+                                informationText.text = inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetInformation();
+                                informationValueText.text = "攻撃力：" + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetAmount()}";
+                            }
+                            else
+                            {
+                                informationText.text = inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetInformation();
+                                informationValueText.text = "防御力：" + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetAmount()}";
+                            }
+                        }
+                        else
+                        {
+                            informationText.text = inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetInformation();
+                            informationValueText.text = "回復量：" + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetAmount()}";
+                        }
+                    }
+                    else
+                    {
+                        descriptionPanel.SetActive(false);
+                    }
+                }
+                itemSlots[i].SetSelectedColor(selected);
+            }
+        }
+        else if (state == ItemStatus.ItemUseCharaSelect)
+        {
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (selectedItemUseChara == 0)
+                {
+                    selectedItemUseChara++;
+                }
+                else
+                {
+                    selectedItemUseChara--;
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (selectedItemUseChara == 1)
+                {
+                    selectedItemUseChara--;
+                }
+                else
+                {
+                    selectedItemUseChara++;
+                }
+            }
+
+            selectedItemUseChara = Mathf.Clamp(selectedItemUseChara, 0, 1);
+
+            for (int i = 0; i < itemUses.Length; i++)
+            {
+                bool selected = selectedItemUseChara == i;
+                itemUses[i].SetSelectedColor(selected);
+            }
+        }
+
     }
 
     public bool CanSelectedItem()
     {
-        if (inventory.Items.Count <= selectedIndex || itemSlots[selectedIndex] == null || inventory.Items[selectedIndex].item.Base == null)
+        if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item.Base.GetKanjiName() == "未所持")
         {
             return false;
         }
@@ -107,72 +346,569 @@ public class InventoryUI : MonoBehaviour
         return true;
     }
 
+
     public IEnumerator Use()
     {
-        if (inventory.Items[selectedIndex] == null || inventory.Items[selectedIndex].item.Base == null)
+        if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item.Base.GetKanjiName() == "未所持")
         {
             OnUsedItem?.Invoke();
         }
         else
         {
-            Item useItem = inventory.Items[selectedIndex].item;
-            inventory.Items[selectedIndex].posession--;
-            Show();
-            yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-            inventory.Use(useItem);
-            if (inventory.Items[selectedIndex].item.Base.GetItemType() == Type.PoisonRecovery || inventory.Items[selectedIndex].item.Base.GetItemType() == Type.NumbnessRecovery)
+            Item useItem = inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item;
+            if (useItem.Base.itemType == Type.LowContinuation)
             {
+                if (player.Battlers[selectedItemUseChara].Status == null)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else if (player.Battlers[selectedItemUseChara].Status.Id == ConditionID.LowContinuation)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"吐き気がおさまった"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.itemType == Type.LowContinuation)
+            {
+                if (player.Battlers[selectedItemUseChara].Status == null)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
 
+                else if (player.Battlers[selectedItemUseChara].Status.Id == ConditionID.HighContinuation)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"嘔吐がおさまった"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.itemType == Type.Barn)
+            {
+                if (player.Battlers[selectedItemUseChara].Status == null)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else if (player.Battlers[selectedItemUseChara].Status.Id == ConditionID.LowContinuation)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"冷静になってきた"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.itemType == Type.Binding)
+            {
+                if (player.Battlers[selectedItemUseChara].Status == null)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else if (player.Battlers[selectedItemUseChara].Status.Id == ConditionID.LowContinuation)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"すきを見て周りから逃げた"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.itemType == Type.Freeze)
+            {
+                if (player.Battlers[selectedItemUseChara].Status == null)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else if (player.Battlers[selectedItemUseChara].Status.Id == ConditionID.LowContinuation)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"意識を取り戻した"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.itemType == Type.Paralisis)
+            {
+                if (player.Battlers[selectedItemUseChara].Status == null)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else if (player.Battlers[selectedItemUseChara].Status.Id == ConditionID.LowContinuation)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"からだのふるえがおさまった"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.HPFullRecovery)
+            {
+                if (player.Battlers[selectedItemUseChara].MP == player.Battlers[selectedItemUseChara].MaxMP)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    DialogManager.Instance.Close();
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    ItemShow();
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"MPが全回復した"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.MPFullRecovery)
+            {
+                if (player.Battlers[selectedItemUseChara].HP == player.Battlers[selectedItemUseChara].MaxHP)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    DialogManager.Instance.Close();
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    ItemShow();
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"HPが全回復した"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.Weapon || useItem.Base.GetItemType() == Type.Armor || useItem.Base.GetItemType() == Type.Accessory)
+            {
+                inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を装備した"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                OnEquip?.Invoke(useItem);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                yield return null;
+                if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                }
+                else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                {
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                }
+                DialogManager.Instance.Close();
+            }
+            else if (useItem.Base.GetItemType() == Type.HPRecovery)
+            {
+                if (player.Battlers[selectedItemUseChara].HP == player.Battlers[selectedItemUseChara].MaxHP)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    DialogManager.Instance.Close();
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    ItemShow();
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetAmount()}ポイント回復した"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem] = null;
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItemKeep?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.MPRecovery)
+            {
+                if (player.Battlers[selectedItemUseChara].MP == player.Battlers[selectedItemUseChara].MaxMP)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    DialogManager.Instance.Close();
+                    descriptionPanel.SetActive(false);
+                    OnUsedItem?.Invoke();
+                    yield break;
+                }
+                else
+                {
+                    inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
+                    ItemShow();
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    inventory.Use(useItem, selectedItemUseChara);
+                    inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectedItemUseChara]);
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetAmount()}ポイント回復した"));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
+                    {
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem] = null;
+                    }
+                    else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
+                    {
+                        descriptionPanel.SetActive(false);
+                        OnUsedItemKeep?.Invoke();
+                    }
+                    DialogManager.Instance.Close();
+                }
+            }
+        }
+    }
+
+    public IEnumerator UseInBattle(int selectChara,int selectItem,int selectUseChara)
+    {
+        if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item.Base.GetKanjiName() == "未所持")
+        {
+            OnUsedItem?.Invoke();
+        }
+        else if (selectedItemType == 1 || selectedItemType == 2)
+        {
+            OnUsedItem?.Invoke();
+
+        }
+        else
+        {
+            Item useItem = inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item;
+            if (useItem.Base.GetItemType() == Type.LowContinuation)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"吐き気がおさまった"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
+
+            }
+            else if (useItem.Base.GetItemType() == Type.HighContinuation)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"嘔吐がおさまった"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.Barn)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"冷静になってきた"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.Binding)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"すきをみて周りから逃げた"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.Freeze)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"意識を取り戻した"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.Paralisis)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"からだのふるえがおさまった"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
+            }
+            else if (useItem.Base.GetItemType() == Type.HPFullRecovery || useItem.Base.GetItemType() == Type.MPFullRecovery)
+            {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
+                if (useItem.Base.GetItemType() == Type.HPFullRecovery)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectUseChara].MaxHP}ポイント回復した"));
+                }
+                else if (useItem.Base.GetItemType() == Type.MPFullRecovery)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectUseChara].MaxMP}ポイント回復した"));
+                }
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
             }
             else
             {
+                inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                inventory.Use(useItem, selectUseChara);
+                inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
                 yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetAmount()}ポイント回復した"));
                 yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-            }
-            if (inventory.Items[selectedIndex].posession <= 0)
-            {
-                inventory.Items[selectedIndex] = null;
-            }
-            DialogManager.Instance.Close();
-            OnUsedItem?.Invoke();
-        }
-    }
-
-    public IEnumerator UseInBattle()
-    {
-        if (inventory.Items[selectedIndex] == null || inventory.Items[selectedIndex].item.Base == null)
-        {
-        }
-        else
-        {
-            Item useItem = inventory.Items[selectedIndex].item;
-            inventory.Items[selectedIndex].posession --;
-            Show();
-            yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-            inventory.Use(useItem);
-            yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetAmount()}ポイント回復した"));
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-            if (inventory.Items[selectedIndex].posession <= 0)
-            {
-                inventory.Items[selectedIndex] = null;
+                if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession <= 0)
+                {
+                    inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
+                }
             }
         }
     }
 
 
 
-    public void Open()
+    public void ItemCharaSelectOpen()
     {
-        inventoryPanel.SetActive(true);
-        descriptionPanel.SetActive(true);
-        Init();
+        state = ItemStatus.CharaSelect;
+        itemCharaPanel.SetActive(true);
+        ItemCharaInit();
     }
 
-    public void Close()
+    public void ItemCharaSelectClose()
     {
-        inventoryPanel.SetActive(false);
+        itemCharaPanel.SetActive(false);
+    }
+    public void ItemTypeSelectOpen()
+    {
+        state = ItemStatus.ItemTypeSelect;
+        itemTypePanel.SetActive(true);
+        ItemTypeInit();
+    }
+
+    public void ItemTypeSelectClose()
+    {
+        itemTypePanel.SetActive(false);
+    }
+    public void ItemSelectOpen()
+    {
+        state = ItemStatus.ItemSelect;
+        itemPanel.SetActive(true);
+        inventoryStatusUI.Open();
+        ItemInit();
+    }
+
+    public void ItemSelectClose()
+    {
+        itemPanel.SetActive(false);
+        descriptionPanel.SetActive(false);
+        inventoryStatusUI.Close();
+    }
+    public void UseItemCharaSelectOpen()
+    {
+        selectedItemUseChara = 0;
+        state = ItemStatus.ItemUseCharaSelect;
+        itemUseCharaPanel.SetActive(true);
+        ItemUseInit();
+    }
+
+    public void UseItemCharaSelectClose()
+    {
+        itemUseCharaPanel.SetActive(false);
         descriptionPanel.SetActive(false);
     }
 }

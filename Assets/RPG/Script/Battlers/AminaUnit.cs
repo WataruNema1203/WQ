@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public class PlayerUnit : BattleUnit
+public class AminaUnit : BattleUnit
 {
     [SerializeField] Text levelText;
     [SerializeField] Text hpText;
@@ -12,7 +12,7 @@ public class PlayerUnit : BattleUnit
     Text[] playerTexts;
 
 
-    Color dai =Color.red;
+    Color dai = Color.red;
     Color alive = Color.white;
     public override void Setup(Battler battler)
     {
@@ -40,17 +40,17 @@ public class PlayerUnit : BattleUnit
         levelText.text = $"LV：{battler.Level}";
         hpText.text = $"HP：{battler.HP}/{battler.MaxHP}";
         mpText.text = $"MP：{ battler.MP}/{ battler.MaxMP}";
-        if (battler.HP<=0)
+        if (battler.HP <= 0)
         {
             conditionText.text = "RIP";
         }
-        else if (battler.Status==null)
+        else if (battler.Status == null)
         {
             conditionText.text = "状態：正常";
         }
         else
         {
-        conditionText.text = $"状態：{battler.Status.Name}";
+            conditionText.text = $"状態：{battler.Status.Name}";
         }
 
     }

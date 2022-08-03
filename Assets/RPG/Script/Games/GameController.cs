@@ -11,6 +11,7 @@ enum GameState
     OpenMenu,
     OpenStatusUI,
     OpenInventory,
+    OpenFieldSkill,
     Shop,
     ShowDialog,
     Busy,
@@ -24,6 +25,7 @@ public class GameController : MonoBehaviour
     [SerializeField] TreasureBoxController treasureBoxController;
     [SerializeField] BattleSystem battleSystem;
     [SerializeField] InventoryUI inventoryUI;
+    [SerializeField] FieldSkillController fieldSkill;
     [SerializeField] StatusUI statusUI;
     [SerializeField] ShopController shop;
     [SerializeField] ShopNPCController shopNPC;
@@ -54,7 +56,7 @@ public class GameController : MonoBehaviour
         inventoryUI.OnEquip += Equip;
         inventoryUI.OnUsedItem += UsedItem;
         inventoryUI.OnSelectStart += ItemSelect;
-        inventoryUI.OnUsedItemKeep += UsedItemKeep;
+        fieldSkill.OnSkill += FieldSkill;
         shopNPC.OnShopStart += StartShop;
         shop.OnBuyItem += ShopAddStart;
         shop.OnSellItem += ShopSellStart;
@@ -79,9 +81,17 @@ public class GameController : MonoBehaviour
         inventoryUI.UseItemCharaSelectClose();
         inventoryUI.ItemSelectOpen();
     }
-    void UsedItemKeep()
+
+    void SkillSelect()
     {
-        state = GameState.OpenInventory;
+        state = GameState.OpenFieldSkill;
+        fieldSkill.SkillCharaSelectOpen();
+    }
+
+    void FieldSkill()
+    {
+        state = GameState.OpenFieldSkill;
+        fieldSkill.UseSkillCharaSelectOpen();
     }
 
 
@@ -121,6 +131,9 @@ public class GameController : MonoBehaviour
             case GameState.OpenInventory:
                 HandleUpdateInventory();
                 break;
+            case GameState.OpenFieldSkill:
+                HandleUpdateSkill();
+                break;
             case GameState.OpenMenu:
                 HandleUpdateOpenMenu();
                 break;
@@ -146,12 +159,51 @@ public class GameController : MonoBehaviour
     void HandleUpdateOpenMenu()
     {
         item.HandleUpdate();
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            switch (item.State)
+            {
+                case MenuState.SelectStart:
+                    if (item.MenuSelectionUI.SelectedIndex == 0)
+                    {
+
+                        item.StatusUI.Open();
+                        item.State = MenuState.Status;
+                    }
+                    else if (item.MenuSelectionUI.SelectedIndex == 1)
+                    {
+                        item.InventorySelection();
+                        ItemSelect();
+                    }
+                    else if (item.MenuSelectionUI.SelectedIndex == 2)
+                    {
+                        item.SkillSelection();
+                        SkillSelect();
+                    }
+                    else if (item.MenuSelectionUI.SelectedIndex == 3)
+                    {
+
+                    }
+                    else if (item.MenuSelectionUI.SelectedIndex == 4)
+                    {
+
+                        item.MenuSelectionUI.Close();
+                        item.State = MenuState.End;
+                        item.MenuSelectEnd();
+                    }
+                    break;
+            }
+        }
+
         if (Input.GetKeyDown(KeyCode.X))
         {
-            if (item.State == MenuState.Status)
+            switch (item.State)
             {
-                statusUI.Close();
-                item.Open();
+                case MenuState.Status:
+                    statusUI.Close();
+                    item.Open();
+                    break;
             }
         }
     }
@@ -221,6 +273,55 @@ public class GameController : MonoBehaviour
             {
                 inventoryUI.UseItemCharaSelectClose();
                 inventoryUI.ItemSelectOpen();
+            }
+        }
+    }
+    void HandleUpdateSkill()
+    {
+        fieldSkill.HandleUpdateSkillSelection();
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            if (fieldSkill.State == SkillStatus.CharaSelect)
+            {
+                if (inventoryUI.SelectedChara < player.Battlers.Count)
+                {
+                    item.Close();
+                    fieldSkill.SkillSelectOpen();
+                }
+            }
+            else if (fieldSkill.State == SkillStatus.SkillSelect && fieldSkill.CanSelectedSkill())
+            {
+                if (player.Battlers[fieldSkill.SelectedChara].Moves[fieldSkill.SelectedSkill].Base.Target==MoveTarget.Foe)
+                {
+                    state = GameState.Busy;
+                    StartCoroutine(fieldSkill.Skill());
+                }
+                fieldSkill.UseSkillCharaSelectOpen();
+            }
+            else if (fieldSkill.State == SkillStatus.SkillUseCharaSelect)
+            {
+                state = GameState.Busy;
+                StartCoroutine(fieldSkill.Skill());
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            if (fieldSkill.State == SkillStatus.CharaSelect)
+            {
+                state = GameState.OpenMenu;
+                fieldSkill.SkillCharaSelectClose();
+            }
+            else if (fieldSkill.State == SkillStatus.SkillSelect)
+            {
+                fieldSkill.SkillSelectClose();
+                item.Open();
+                fieldSkill.SkillCharaSelectOpen();
+            }
+            else if (fieldSkill.State == SkillStatus.SkillUseCharaSelect)
+            {
+                fieldSkill.UseSkillCharaSelectClose();
+                fieldSkill.SkillSelectOpen();
             }
         }
     }
@@ -342,6 +443,13 @@ public class GameController : MonoBehaviour
         item.Close();
         menuBar.SetActive(true);
         player.StartPlayer();
+    }
+
+    public void StartFieldSkill()
+    {
+        state = GameState.OpenFieldSkill;
+        menuBar.SetActive(false);
+        fieldSkill.SkillCharaSelectOpen();
     }
 
     public void StartShop()

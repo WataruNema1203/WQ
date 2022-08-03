@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 
 //技の基礎データ
@@ -8,7 +9,10 @@ using UnityEngine;
 public class MoveBase : ScriptableObject
 {
     [SerializeField] new string name;
+    [TextArea]
+    [SerializeField] string information;
     [SerializeField] int power;
+    [SerializeField] int skillPower;
     [SerializeField] int mp;
 
     //カテゴリー（物理・特殊・ステータス変化）
@@ -30,6 +34,8 @@ public class MoveBase : ScriptableObject
     public int Power { get => power; }
     public int Mp { get => mp; }
     public MoveCategory2 Category2 { get => category2; }
+    public string Information { get => information;}
+    public int SkillPower { get => skillPower; }
 
     public virtual string RunMoveResult(Battler attacker, Battler target,int damage)
     {
@@ -43,6 +49,9 @@ public enum MoveCategory1
     Physical,
     Skill,
     Heal,
+    FullHeal,
+    Resuscitation,
+    Field,
     Stat,
 }
 

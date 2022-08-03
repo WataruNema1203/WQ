@@ -9,8 +9,10 @@ public class PlayerController : MonoBehaviour
     bool isMoving;
     bool isSelect;
     Vector2 input;
-    float moveSpeed = 5;
-    int encountMod = 0;//エンカウント率0-100%
+    readonly float moveSpeed = 5;
+    int encountMod = 10;//エンカウント率0-100%
+    float count;
+    float encountSkill;
     Animator animator;
 
 
@@ -20,6 +22,7 @@ public class PlayerController : MonoBehaviour
 
     public List<Battler> Battlers { get => battlers; }
     public int EncountMod { get => encountMod; set => encountMod = value; }
+    public float EncountSkill { get => encountSkill; set => encountSkill = value; }
 
     private void Awake()
     {
@@ -29,7 +32,6 @@ public class PlayerController : MonoBehaviour
     {
         Battlers[0].Init();
         isSelect = false;
-        Battlers[0].Gold += 2000;
 
     }
 
@@ -66,7 +68,10 @@ public class PlayerController : MonoBehaviour
             Interact();
         }
 
-        StoryInteract();
+        if (!isSelect)
+        {
+            StoryInteract();
+        }
     }
 
     public void StartPlayer()
@@ -103,7 +108,25 @@ public class PlayerController : MonoBehaviour
 
         transform.position = targetPos;
         CheckForEncounters();
+        EncountSkillCount();
     }
+
+    public void EncountSkillCount()
+    {
+        if (encountSkill > 0)
+        {
+            count += 1;
+            if (encountSkill <= count)
+            {
+                encountMod = 10;
+                encountSkill = 0;
+                count = 0;
+                Debug.Log("効果切れ");
+                return;
+            }
+        }
+    }
+
 
     void CheckForEncounters()
     {
@@ -141,7 +164,7 @@ public class PlayerController : MonoBehaviour
 
         Vector3 interactPos = transform.position + faceDirection;
 
-        Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.3f, GameLayers.Instance.StoryLayer);
+        Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.5f, GameLayers.Instance.StoryLayer);
         if (collider2D)
         {
             isSelect = true;

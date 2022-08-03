@@ -25,73 +25,33 @@ public class ItemController : MonoBehaviour
     public UnityAction MenuSelectEnd;
     public UnityAction OnInventorySelect;
 
-    internal MenuState State { get => state; }
+    public MenuSelectionUI MenuSelectionUI { get => menuSelectionUI; }
+    public StatusUI StatusUI { get => statusUI;}
+    public GameObject ItemMenu1 { get => ItemMenu;}
+    internal MenuState State { get => state; set => state = value; }
 
     public void HandleUpdate()
     {
         menuSelectionUI.HandleUpdate();
 
-        if (Input.GetKeyDown(KeyCode.Z))
-        {
-            if (menuSelectionUI.SelectedIndex == 0)
-            {
-                if (state == MenuState.SelectStart)
-                {
-                    statusUI.Open();
-                    state = MenuState.Status;
-
-                }
-            }
-            else if (menuSelectionUI.SelectedIndex == 1)
-            {
-                if (state == MenuState.SelectStart)
-                {
-
-                    InventorySelection();
-                    OnInventorySelect();
-                }
-            }
-            else if (menuSelectionUI.SelectedIndex == 2)
-            {
-                if (state == MenuState.SelectStart)
-                {
-
-                }
-
-            }
-            else if (menuSelectionUI.SelectedIndex == 3)
-            {
-                if (state == MenuState.SelectStart)
-                {
-
-                }
-
-            }
-            else if (menuSelectionUI.SelectedIndex == 4)
-            {
-                if (state == MenuState.SelectStart)
-                {
-
-                    menuSelectionUI.Close();
-                    state = MenuState.End;
-                    MenuSelectEnd();
-                }
-
-            }
-        }
     }
 
 
-    void MenuSelection()
+    public void MenuSelection()
     {
         state = MenuState.SelectStart;
         menuSelectionUI.Open();
         menuSelectionUI.Init();
     }
 
-    void InventorySelection()
+    public void InventorySelection()
     {
         state = MenuState.InventorySelection;
+
+    }
+    public void SkillSelection()
+    {
+        state = MenuState.SkillSelection;
 
     }
 

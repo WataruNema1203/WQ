@@ -592,6 +592,10 @@ public class BattleSystem : MonoBehaviour
                 yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp}リットルの酒を飲み切った！");
                 //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
                 yield return OnLevelUp(playerUnit);
+                //ゴールド獲得
+                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //ドロップアイテム取得
                 yield return DropItemCheck();
                 BattleOver(isWin);
@@ -651,6 +655,10 @@ public class BattleSystem : MonoBehaviour
                 yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp}リットルの酒を飲み切った！");
                 //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
                 yield return OnLevelUp(aminaUnit);
+                //ゴールド獲得
+                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //ドロップアイテム取得
                 yield return DropItemCheck();
                 BattleOver(isWin);
@@ -719,6 +727,10 @@ public class BattleSystem : MonoBehaviour
                 yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
                 //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
                 yield return OnLevelUp(aminaUnit);
+                //ゴールド獲得
+                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //ドロップアイテム取得
                 yield return DropItemCheck();
                 BattleOver(isWin);
@@ -822,6 +834,10 @@ public class BattleSystem : MonoBehaviour
                 yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
                 //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
                 yield return OnLevelUp(aminaUnit);
+                //ゴールド獲得
+                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //ドロップアイテム取得
                 yield return DropItemCheck();
                 BattleOver(isWin);
@@ -1061,6 +1077,10 @@ public class BattleSystem : MonoBehaviour
                 yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
                 //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
                 yield return OnLevelUp(aminaUnit);
+                //ゴールド獲得
+                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //ドロップアイテム取得
                 yield return DropItemCheck();
                 BattleOver(isWin);
@@ -1100,6 +1120,10 @@ public class BattleSystem : MonoBehaviour
                 yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
                 //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
                 yield return OnLevelUp(aminaUnit);
+                //ゴールド獲得
+                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //ドロップアイテム取得
                 yield return DropItemCheck();
                 BattleOver(isWin);

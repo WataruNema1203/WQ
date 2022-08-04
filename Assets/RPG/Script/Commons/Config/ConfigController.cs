@@ -8,6 +8,7 @@ enum ConfigState
     Select,
     PlayerNameChange,
     WordsSelect,
+    Busy,
 }
 enum WordsState
 {
@@ -18,6 +19,7 @@ enum WordsState
 
 public class ConfigController : MonoBehaviour
 {
+    [SerializeField] PlayerController player;
     [SerializeField] GameObject configMenuPanel;
     [SerializeField] GameObject hiraPanel;
     [SerializeField] GameObject kanaPanel;
@@ -35,9 +37,9 @@ public class ConfigController : MonoBehaviour
     SelectableText[] selectableTexts;
     TextUI[] textSlots;
     Text[] texts;
-    int selectedWords;
-    int selectedIndex;
-    int selectedWordType;
+    int selectedWords=0;
+    int selectedIndex=0;
+    int selectedWordType=0;
 
 
 
@@ -48,32 +50,27 @@ public class ConfigController : MonoBehaviour
     public void ConfigMenuInit()
     {
         configState = ConfigState.Select;
-        selectedIndex = 0;
         selectableTexts = configMenuPanel.GetComponentsInChildren<SelectableText>();
     }
     public void WordTypeInit()
     {
         configState = ConfigState.PlayerNameChange;
-        selectedWordType = 0;
         selectableTexts = wordsPanel.GetComponentsInChildren<SelectableText>();
     }
     public void HiraInit()
     {
-        selectedWords = 0;
         wordsState = WordsState.Hiragana;
         textSlots = hiraPanel.GetComponentsInChildren<TextUI>();
         texts = hiraPanel.GetComponentsInChildren<Text>();
     }
     public void KanaInit()
     {
-        selectedWords = 0;
         wordsState = WordsState.Katakana;
         textSlots = kanaPanel.GetComponentsInChildren<TextUI>();
         texts = kanaPanel.GetComponentsInChildren<Text>();
     }
     public void EngInit()
     {
-        selectedWords = 0;
         wordsState = WordsState.English;
         textSlots = engPanel.GetComponentsInChildren<TextUI>();
         texts = engPanel.GetComponentsInChildren<Text>();
@@ -112,15 +109,34 @@ public class ConfigController : MonoBehaviour
                 {
                     PlayerNameChengeOpen();
                 }
+                else if (Input.GetKeyDown(KeyCode.X))
+                {
+
+                }
+
                 break;
             case ConfigState.PlayerNameChange:
                 if (Input.GetKeyDown(KeyCode.DownArrow))
                 {
-                    selectedWordType++;
+                    if (selectedWordType == 4)
+                    {
+                        selectedWordType = 0;
+                    }
+                    else
+                    {
+                        selectedWordType++;
+                    }
                 }
                 else if (Input.GetKeyDown(KeyCode.UpArrow))
                 {
-                    selectedWordType--;
+                    if (selectedWordType == 0)
+                    {
+                        selectedWordType = 4;
+                    }
+                    else
+                    {
+                        selectedWordType--;
+                    }
                 }
                 selectedWordType = Mathf.Clamp(selectedWordType, 0, selectableTexts.Length - 1);
 
@@ -156,7 +172,6 @@ public class ConfigController : MonoBehaviour
 
                 if (Input.GetKeyDown(KeyCode.Z))
                 {
-                    configState = ConfigState.WordsSelect;
                     switch (selectedWordType)
                     {
                         case 0:
@@ -168,8 +183,21 @@ public class ConfigController : MonoBehaviour
                         case 2:
                             EngOpen();
                             break;
+                        case 3:
+                            PlayerNameChengeClose();
+                            break;
+                        case 4:
+                            StartCoroutine(SetName());
+                            break;
+                        default:
+                            break;
                     }
                 }
+                else if (Input.GetKeyDown(KeyCode.X))
+                {
+                    PlayerNameChengeClose();
+                }
+
 
                 break;
             case ConfigState.WordsSelect:
@@ -180,7 +208,15 @@ public class ConfigController : MonoBehaviour
                         {
                             if (selectedWords == 0)
                             {
-                                selectedWords += 49;
+                                selectedWords = 84;
+                            }
+                            else if (selectedWords==37||selectedWords==39||selectedWords==47||selectedWords==49||selectedWords==82||selectedWords==84)
+                            {
+                                selectedWords -= 2;
+                            }
+                            else if (selectedWords == 85)
+                            {
+                                selectedWords++;
                             }
                             else
                             {
@@ -190,9 +226,18 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.DownArrow))
                         {
-                            if (selectedWords == 49)
+                            if (selectedWords == 84)
                             {
-                                selectedWords -= 49;
+                                selectedWords = 0;
+                            }
+                            else if (selectedWords == 35 || selectedWords == 37 || selectedWords == 45 || selectedWords == 47 || selectedWords == 80 || selectedWords == 82)
+                            {
+                                selectedWords += 2;
+
+                            }
+                            else if (selectedWords == 86)
+                            {
+                                selectedWords--;
                             }
                             else
                             {
@@ -202,9 +247,29 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.LeftArrow))
                         {
-                            if (selectedWords >= 45)
+                            if (selectedWords == 85 || selectedWords == 86)
                             {
-                                selectedWords -= 45;
+                                selectedWords -= 82;
+                            }
+                            else if (selectedWords == 31 || selectedWords == 33 || selectedWords == 41 || selectedWords == 43)
+                            {
+                                selectedWords += 10;
+                            }
+                            else if (selectedWords == 76)
+                            {
+                                selectedWords -= 75;
+                            }
+                            else if (selectedWords == 78)
+                            {
+                                selectedWords += 7;
+                            }
+                            else if (selectedWords == 84)
+                            {
+                                selectedWords += 2;
+                            }
+                            else if (selectedWords >= 80)
+                            {
+                                selectedWords -= 80;
                             }
                             else
                             {
@@ -214,9 +279,29 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.RightArrow))
                         {
-                            if (selectedWords <= 4)
+                            if (selectedWords == 85)
                             {
-                                selectedWords += 45;
+                                selectedWords -= 7;
+                            }
+                            else if (selectedWords == 86)
+                            {
+                                selectedWords -= 2;
+                            }
+                            else if (selectedWords == 3 || selectedWords == 4)
+                            {
+                                selectedWords += 82;
+                            }
+                            else if (selectedWords == 1 )
+                            {
+                                selectedWords += 75;
+                            }
+                            else if (selectedWords == 41 || selectedWords == 43 || selectedWords == 51 || selectedWords == 53)
+                            {
+                                selectedWords -= 10;
+                            }
+                            else if (selectedWords <= 4)
+                            {
+                                selectedWords += 80;
                             }
                             else
                             {
@@ -226,7 +311,16 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.Z))
                         {
-                            if (nameText1.text == "-")
+                            if (selectedWords == 86)
+                            {
+                                StartCoroutine(SetName());
+
+                            }
+                            else if (selectedWords == 85)
+                            {
+                                HiraClose();
+                            }
+                            else if (nameText1.text == "-")
                             {
                                 nameText1.text = texts[selectedWords].text;
 
@@ -268,7 +362,7 @@ public class ConfigController : MonoBehaviour
                                 }
                             }
                         }
-                        else if (Input.GetKeyDown(KeyCode.C))
+                        else if (Input.GetKeyDown(KeyCode.Backspace))
                         {
                             if (nameText5.text != "-")
                             {
@@ -308,13 +402,10 @@ public class ConfigController : MonoBehaviour
                                 }
                             }
                         }
-
                         else if (Input.GetKeyDown(KeyCode.X))
                         {
                             HiraClose();
                         }
-
-
                         selectedWords = Mathf.Clamp(selectedWords, 0, textSlots.Length - 1);
 
                         for (int i = 0; i < textSlots.Length; i++)
@@ -335,7 +426,11 @@ public class ConfigController : MonoBehaviour
                         {
                             if (selectedWords == 0)
                             {
-                                selectedWords += 49;
+                                selectedWords = 84;
+                            }
+                            else if (selectedWords == 85)
+                            {
+                                selectedWords++;
                             }
                             else
                             {
@@ -345,9 +440,13 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.DownArrow))
                         {
-                            if (selectedWords == 49)
+                            if (selectedWords == 84)
                             {
-                                selectedWords -= 49;
+                                selectedWords = 0;
+                            }
+                            else if (selectedWords == 86)
+                            {
+                                selectedWords--;
                             }
                             else
                             {
@@ -357,9 +456,17 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.LeftArrow))
                         {
-                            if (selectedWords >= 45)
+                            if (selectedWords == 85 || selectedWords == 86)
                             {
-                                selectedWords -= 45;
+                                selectedWords -= 82;
+                            }
+                            else if (selectedWords == 83 || selectedWords == 84)
+                            {
+                                selectedWords += 2;
+                            }
+                            else if (selectedWords >= 80)
+                            {
+                                selectedWords -= 80;
                             }
                             else
                             {
@@ -369,9 +476,17 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.RightArrow))
                         {
-                            if (selectedWords <= 4)
+                            if (selectedWords == 85 || selectedWords == 86)
                             {
-                                selectedWords += 45;
+                                selectedWords -= 2;
+                            }
+                            else if (selectedWords == 3 || selectedWords == 4)
+                            {
+                                selectedWords += 82;
+                            }
+                            else if (selectedWords <= 4)
+                            {
+                                selectedWords += 80;
                             }
                             else
                             {
@@ -381,7 +496,15 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.Z))
                         {
-                            if (nameText1.text == "-")
+                            if (selectedWords == 86)
+                            {
+                                StartCoroutine(SetName());
+                            }
+                            else if (selectedWords == 85)
+                            {
+                                KanaClose();
+                            }
+                            else if (nameText1.text == "-")
                             {
                                 nameText1.text = texts[selectedWords].text;
 
@@ -423,7 +546,7 @@ public class ConfigController : MonoBehaviour
                                 }
                             }
                         }
-                        else if (Input.GetKeyDown(KeyCode.C))
+                        else if (Input.GetKeyDown(KeyCode.Backspace))
                         {
                             if (nameText5.text != "-")
                             {
@@ -463,13 +586,10 @@ public class ConfigController : MonoBehaviour
                                 }
                             }
                         }
-
                         else if (Input.GetKeyDown(KeyCode.X))
                         {
                             KanaClose();
                         }
-
-
                         selectedWords = Mathf.Clamp(selectedWords, 0, textSlots.Length - 1);
 
                         for (int i = 0; i < textSlots.Length; i++)
@@ -490,7 +610,11 @@ public class ConfigController : MonoBehaviour
                         {
                             if (selectedWords == 0)
                             {
-                                selectedWords += 49;
+                                selectedWords = 49;
+                            }
+                            else if (selectedWords == 50)
+                            {
+                                selectedWords = 51;
                             }
                             else
                             {
@@ -502,7 +626,11 @@ public class ConfigController : MonoBehaviour
                         {
                             if (selectedWords == 49)
                             {
-                                selectedWords -= 49;
+                                selectedWords = 0;
+                            }
+                            else if (selectedWords == 51)
+                            {
+                                selectedWords = 50;
                             }
                             else
                             {
@@ -512,7 +640,15 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.LeftArrow))
                         {
-                            if (selectedWords >= 45)
+                            if (selectedWords == 50 || selectedWords == 51)
+                            {
+                                selectedWords -= 47;
+                            }
+                            else if (selectedWords == 48 || selectedWords == 49)
+                            {
+                                selectedWords += 2;
+                            }
+                            else if (selectedWords >= 45)
                             {
                                 selectedWords -= 45;
                             }
@@ -524,7 +660,15 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.RightArrow))
                         {
-                            if (selectedWords <= 4)
+                            if (selectedWords == 50 || selectedWords == 51)
+                            {
+                                selectedWords -= 2;
+                            }
+                            else if (selectedWords == 3 || selectedWords == 4)
+                            {
+                                selectedWords += 47;
+                            }
+                            else if (selectedWords <= 4)
                             {
                                 selectedWords += 45;
                             }
@@ -536,7 +680,15 @@ public class ConfigController : MonoBehaviour
                         }
                         else if (Input.GetKeyDown(KeyCode.Z))
                         {
-                            if (nameText1.text == "-")
+                            if (selectedWords == 51)
+                            {
+                                StartCoroutine(SetName());
+                            }
+                            else if (selectedWords == 50)
+                            {
+                                EngClose();
+                            }
+                            else if (nameText1.text == "-")
                             {
                                 nameText1.text = texts[selectedWords].text;
 
@@ -578,7 +730,7 @@ public class ConfigController : MonoBehaviour
                                 }
                             }
                         }
-                        else if (Input.GetKeyDown(KeyCode.C))
+                        else if (Input.GetKeyDown(KeyCode.Backspace))
                         {
                             if (nameText5.text != "-")
                             {
@@ -622,7 +774,6 @@ public class ConfigController : MonoBehaviour
                         {
                             EngClose();
                         }
-
                         selectedWords = Mathf.Clamp(selectedWords, 0, textSlots.Length - 1);
 
                         for (int i = 0; i < textSlots.Length; i++)
@@ -648,45 +799,108 @@ public class ConfigController : MonoBehaviour
 
     public void ConfigOpen()
     {
+        selectedIndex = 0;
         configMenuPanel.SetActive(true);
         ConfigMenuInit();
+    }
+    public void ConfigClose()
+    {
+        configMenuPanel.SetActive(false);
     }
 
     public void PlayerNameChengeOpen()
     {
+        selectedIndex = 0;
         wordsPanel.SetActive(true);
         hiraPanel.SetActive(true);
         playerNamePanel.SetActive(true);
         enterOrBackPanel.SetActive(true);
         WordTypeInit();
     }
+    public void PlayerNameChengeClose()
+    {
+        wordsPanel.SetActive(false);
+        hiraPanel.SetActive(false);
+        kanaPanel.SetActive(false);
+        engPanel.SetActive(false);
+        playerNamePanel.SetActive(false);
+        enterOrBackPanel.SetActive(false);
+        ConfigOpen();
+    }
 
     public void HiraOpen()
     {
+        configState = ConfigState.WordsSelect;
         hiraPanel.SetActive(true);
         HiraInit();
     }
     public void KanaOpen()
     {
+        configState = ConfigState.WordsSelect;
         kanaPanel.SetActive(true);
         KanaInit();
     }
     public void EngOpen()
     {
+        configState = ConfigState.WordsSelect;
         engPanel.SetActive(true);
         EngInit();
     }
     public void HiraClose()
     {
+        selectedWords = 0;
         PlayerNameChengeOpen();
     }
     public void KanaClose()
     {
+        selectedWords = 0;
         PlayerNameChengeOpen();
     }
     public void EngClose()
     {
+        selectedWords = 0;
         PlayerNameChengeOpen();
     }
-
+    IEnumerator SetName()
+    {
+        configState = ConfigState.Busy;
+        if (nameText5.text != "-")
+        {
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"y_•ƒz\n{player.Battlers[0].Base.Name}‚Ì–¼‘O‚ð{nameText1.text}{nameText2.text}{nameText3.text}{nameText4.text}{nameText5.text}‚É•Ï‚¦‚Ü‚µ‚½B\n‚ ‚È‚½‚É_‚Ì‚²‰ÁŒì‚ª‚ ‚è‚Ü‚·‚æ‚¤‚ÉB"));
+            player.Battlers[0].Base.SetNeme($"{nameText1.text}{nameText2.text}{nameText3.text}{nameText4.text}{nameText5.text}");
+        }
+        else if (nameText4.text != "-")
+        {
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"y_•ƒz\n{player.Battlers[0].Base.Name}‚Ì–¼‘O‚ð{nameText1.text}{nameText2.text}{nameText3.text}{nameText4.text}‚É•Ï‚¦‚Ü‚µ‚½B\n‚ ‚È‚½‚É_‚Ì‚²‰ÁŒì‚ª‚ ‚è‚Ü‚·‚æ‚¤‚ÉB"));
+            player.Battlers[0].Base.SetNeme($"{nameText1.text}{nameText2.text}{nameText3.text}{nameText4.text}");
+        }
+        else if (nameText3.text != "-")
+        {
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"y_•ƒz\n{player.Battlers[0].Base.Name}‚Ì–¼‘O‚ð{nameText1.text}{nameText2.text}{nameText3.text}‚É•Ï‚¦‚Ü‚µ‚½B\n‚ ‚È‚½‚É_‚Ì‚²‰ÁŒì‚ª‚ ‚è‚Ü‚·‚æ‚¤‚ÉB"));
+            player.Battlers[0].Base.SetNeme($"{nameText1.text}{nameText2.text}{nameText3.text}");
+        }
+        else if (nameText2.text != "-")
+        {
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"y_•ƒz\n{player.Battlers[0].Base.Name}‚Ì–¼‘O‚ð{nameText1.text}{nameText2.text}‚É•Ï‚¦‚Ü‚µ‚½B\n‚ ‚È‚½‚É_‚Ì‚²‰ÁŒì‚ª‚ ‚è‚Ü‚·‚æ‚¤‚ÉB"));
+            player.Battlers[0].Base.SetNeme($"{nameText1.text}{nameText2.text}");
+        }
+        else if (nameText1.text != "-")
+        {
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"y_•ƒz\n{player.Battlers[0].Base.Name}‚Ì–¼‘O‚ð{nameText1.text}‚É•Ï‚¦‚Ü‚µ‚½B\n‚ ‚È‚½‚É_‚Ì‚²‰ÁŒì‚ª‚ ‚è‚Ü‚·‚æ‚¤‚ÉB"));
+            player.Battlers[0].Base.SetNeme($"{nameText1.text}");
+        }
+        else
+        {
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"y_•ƒz\n‚Ü‚¾”Y‚ñ‚Å‚¨‚ç‚ê‚Ä‚¢‚é‚æ‚¤‚Å‚·‚ËB"));
+        }
+        yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+        nameText1.text = "-";
+        nameText2.text = "-";
+        nameText3.text = "-";
+        nameText4.text = "-";
+        nameText5.text = "-";
+        DialogManager.Instance.Close();
+        PlayerNameChengeClose();
+        configState = ConfigState.Select;
+    }
 }

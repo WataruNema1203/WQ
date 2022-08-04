@@ -30,6 +30,11 @@ public class BattlerBase : ScriptableObject
     [SerializeField]
     private Item equipAccessory;
 
+    public void SetNeme(string name)
+    {
+        this.name=name;
+    }
+
     public void SetEquipWeapon(Item weaponItem)
     {
         this.equipWeapon = weaponItem;

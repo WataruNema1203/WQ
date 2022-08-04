@@ -54,6 +54,11 @@ public class ItemController : MonoBehaviour
         state = MenuState.SkillSelection;
 
     }
+    public void ConfigSelection()
+    {
+        state = MenuState.Config;
+
+    }
 
     public void Open()
     {

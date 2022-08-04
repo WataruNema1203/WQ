@@ -12,6 +12,7 @@ enum GameState
     OpenStatusUI,
     OpenInventory,
     OpenFieldSkill,
+    OpenConfig,
     Shop,
     ShowDialog,
     Busy,
@@ -30,10 +31,10 @@ public class GameController : MonoBehaviour
     [SerializeField] ShopController shop;
     [SerializeField] ShopNPCController shopNPC;
     [SerializeField] ItemController item;
+    [SerializeField] ConfigController config;
     [SerializeField] GameObject menuBar;
     [SerializeField] GameState state;
     public static GameController Instance { get; private set; }
-
 
     private void Awake()
     {
@@ -82,10 +83,11 @@ public class GameController : MonoBehaviour
         inventoryUI.ItemSelectOpen();
     }
 
-    void SkillSelect()
+
+    void ConfigSelect()
     {
-        state = GameState.OpenFieldSkill;
-        fieldSkill.SkillCharaSelectOpen();
+        state = GameState.OpenConfig;
+        config.ConfigOpen();
     }
 
     void FieldSkill()
@@ -137,6 +139,9 @@ public class GameController : MonoBehaviour
             case GameState.OpenMenu:
                 HandleUpdateOpenMenu();
                 break;
+            case GameState.OpenConfig:
+                HandleConfig();
+                break;
             case GameState.Shop:
                 HandleUpdateShop();
                 break;
@@ -179,11 +184,12 @@ public class GameController : MonoBehaviour
                     else if (item.MenuSelectionUI.SelectedIndex == 2)
                     {
                         item.SkillSelection();
-                        SkillSelect();
+                        StartFieldSkill();
                     }
                     else if (item.MenuSelectionUI.SelectedIndex == 3)
                     {
-
+                        item.ConfigSelection();
+                        ConfigSelect();
                     }
                     else if (item.MenuSelectionUI.SelectedIndex == 4)
                     {
@@ -284,7 +290,7 @@ public class GameController : MonoBehaviour
         {
             if (fieldSkill.State == SkillStatus.CharaSelect)
             {
-                if (inventoryUI.SelectedChara < player.Battlers.Count)
+                if (fieldSkill.SelectedChara < player.Battlers.Count)
                 {
                     item.Close();
                     fieldSkill.SkillSelectOpen();
@@ -292,7 +298,7 @@ public class GameController : MonoBehaviour
             }
             else if (fieldSkill.State == SkillStatus.SkillSelect && fieldSkill.CanSelectedSkill())
             {
-                if (player.Battlers[fieldSkill.SelectedChara].Moves[fieldSkill.SelectedSkill].Base.Target==MoveTarget.Foe)
+                if (player.Battlers[fieldSkill.SelectedChara].Moves[fieldSkill.SelectedSkill].Base.Target == MoveTarget.Foe)
                 {
                     state = GameState.Busy;
                     StartCoroutine(fieldSkill.Skill());
@@ -325,6 +331,24 @@ public class GameController : MonoBehaviour
             }
         }
     }
+
+    void HandleConfig()
+    {
+        config.HandleUpdate();
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            switch (config.ConfigState)
+            {
+                case ConfigState.Select:
+                    state = GameState.OpenMenu;
+                    item.State = MenuState.SelectStart;
+                    config.ConfigClose();
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
     void HandleUpdateShop()
     {
         shop.HandleUpdate();
@@ -339,7 +363,7 @@ public class GameController : MonoBehaviour
                 }
                 else if (shop.SelectedItem == 1)
                 {
-                    shop.SellSelectOpen();
+                    shop.SelectSellCharaOpen();
                 }
                 else if (shop.SelectedItem == 2)
                 {
@@ -350,9 +374,48 @@ public class GameController : MonoBehaviour
             {
                 shop.BuyOpen();
             }
+            else if (shop.State == ShopState.BuyCharaSelect)
+            {
+                switch (shop.SelectedBuyChara)
+                {
+                    case 0:
+                        StartCoroutine(shop.Buy());
+                        break;
+                    case 1:
+                        if (player.Battlers.Count == 2)
+                        {
+                            StartCoroutine(shop.Buy());
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+            }
             else if (shop.State == ShopState.Buy)
             {
-                StartCoroutine(shop.Buy());
+                shop.BuyCharaOpen();
+            }
+            else if (shop.State == ShopState.SellCharaSelect)
+            {
+                switch (shop.SelectedChara)
+                {
+                    case 0:
+                        shop.SelectSellItemTypeOpen();
+                        break;
+                    case 1:
+                        if (player.Battlers.Count == 2)
+                        {
+                            shop.SelectSellItemTypeOpen();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+            else if (shop.State == ShopState.SellItemTypeSelect)
+            {
+                shop.SellSelectOpen();
             }
             else if (shop.State == ShopState.SellSelect)
             {
@@ -376,6 +439,18 @@ public class GameController : MonoBehaviour
             else if (shop.State == ShopState.Buy)
             {
                 shop.BuyClose();
+            }
+            else if (shop.State == ShopState.BuyCharaSelect)
+            {
+                shop.BuySelectOpen();
+            }
+            else if (shop.State == ShopState.SellCharaSelect)
+            {
+                shop.SelectSellCharaClose();
+            }
+            else if (shop.State == ShopState.SellItemTypeSelect)
+            {
+                shop.SelectSellItemTypeClose();
             }
             else if (shop.State == ShopState.SellSelect)
             {
@@ -675,82 +750,82 @@ public class GameController : MonoBehaviour
         if (player.Battlers[0].Gold >= item.Base.GetGold() && player.Battlers[0].Gold >= item.Base.GetGold() * sumItem)
         {
             player.Battlers[0].Gold -= item.Base.GetGold() * sumItem;
-            for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
+            for (int i = 0; i < inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items.Count; i++)
             {
                 if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
                 {
-                    if (inventory.ItemCharas[0].ItemTypes[1].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
+                    if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                     {
-                        inventory.ItemCharas[0].ItemTypes[1].Items[i].possession += sumItem;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].possession += sumItem;
                         shop.HasGoldText.text = $"所持金：{player.Battlers[0].Gold}G";
                         shop.BuyClose();
-                        yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
+                        yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
                         yield break;
                     }
                 }
                 else if (item.Base.GetItemType() == Type.Valuables)
                 {
-                    if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
+                    if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                     {
-                        inventory.ItemCharas[0].ItemTypes[2].Items[i].possession += sumItem;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].possession += sumItem;
                         shop.HasGoldText.text = $"所持金：{player.Battlers[0].Gold}G";
                         shop.BuyClose();
-                        yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
+                        yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
                         yield break;
                     }
                 }
                 else
                 {
-                    if (inventory.ItemCharas[0].ItemTypes[0].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
+                    if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                     {
-                        inventory.ItemCharas[0].ItemTypes[0].Items[i].possession += sumItem;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items[i].possession += sumItem;
                         shop.HasGoldText.text = $"所持金：{player.Battlers[0].Gold}G";
                         shop.BuyClose();
-                        yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
+                        yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
                         yield break;
                     }
                 }
             }
-            for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
+            for (int i = 0; i < inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items.Count; i++)
             {
                 if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
                 {
-                    if (inventory.ItemCharas[0].ItemTypes[1].Items[i].item.Base.GetKanjiName() == "未所持")
+                    if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].item.Base.GetKanjiName() == "未所持")
                     {
-                        inventory.ItemCharas[0].ItemTypes[1].Items[i].item = item;
-                        inventory.ItemCharas[0].ItemTypes[1].Items[i].possession += sumItem;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].item = item;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].possession += sumItem;
                         shop.HasGoldText.text = $"所持金：{player.Battlers[0].Gold}G";
                         shop.BuyClose();
-                        yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
+                        yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
                         yield break;
                     }
                 }
                 else if (item.Base.GetItemType() == Type.Valuables)
                 {
-                    if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
+                    if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
                     {
-                        inventory.ItemCharas[0].ItemTypes[2].Items[i].item = item;
-                        inventory.ItemCharas[0].ItemTypes[2].Items[i].possession += sumItem;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].item = item;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].possession += sumItem;
                         shop.HasGoldText.text = $"所持金：{player.Battlers[0].Gold}G";
                         shop.BuyClose();
-                        yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
+                        yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
                         yield break;
                     }
                 }
                 else
                 {
-                    if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
+                    if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items[i].item.Base.GetKanjiName() == "未所持")
                     {
-                        inventory.ItemCharas[0].ItemTypes[2].Items[i].item = item;
-                        inventory.ItemCharas[0].ItemTypes[2].Items[i].possession += sumItem;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items[i].item = item;
+                        inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items[i].possession += sumItem;
                         shop.HasGoldText.text = $"所持金：{player.Battlers[0].Gold}G";
                         shop.BuyClose();
-                        yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
+                        yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
                         yield break;
                     }
@@ -760,11 +835,12 @@ public class GameController : MonoBehaviour
         else
         {
             shop.BuyClose();
-            yield return StartCoroutine(DialogManager.Instance.TypeDialog($"うん？ゴールドが足りないようだよ"));
+            yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"うん？ゴールドが足りないようだよ"));
             shop.BuySelectOpen();
             yield break;
         }
     }
+
     public IEnumerator ShopSellItem(Item item, int sumItem)
     {
         if (sumItem <= 0)
@@ -788,7 +864,7 @@ public class GameController : MonoBehaviour
                     }
                     shop.SellClose();
                     shop.SellSelectOpen();
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か売るもんはあるかい？"));
+                    yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か売るもんはあるかい？"));
                     yield break;
                 }
             }

@@ -9,8 +9,8 @@ public class PlayerController : MonoBehaviour
     bool isMoving;
     bool isSelect;
     Vector2 input;
-    readonly float moveSpeed = 5;
-    int encountMod = 10;//エンカウント率0-100%
+    float moveSpeed = 5;
+    public int encountMod = 5;//エンカウント率0-100%
     float count;
     float encountSkill;
     Animator animator;
@@ -68,6 +68,19 @@ public class PlayerController : MonoBehaviour
             Interact();
         }
 
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            moveSpeed = 10;
+            CameraManager.Instance.Movespeed = 10;
+            encountMod += 5;
+        }
+        if (Input.GetKeyUp(KeyCode.C))
+        {
+            moveSpeed = 5;
+            encountMod -= 5;
+            CameraManager.Instance.Movespeed = 5;
+        }
+
         if (!isSelect)
         {
             StoryInteract();
@@ -118,7 +131,7 @@ public class PlayerController : MonoBehaviour
             count += 1;
             if (encountSkill <= count)
             {
-                encountMod = 10;
+                encountMod = 5;
                 encountSkill = 0;
                 count = 0;
                 Debug.Log("効果切れ");
@@ -135,6 +148,13 @@ public class PlayerController : MonoBehaviour
         {
             if (Random.Range(0, 100) < encountMod)
             {
+                if (Input.GetKey(KeyCode.C))
+                {
+                    moveSpeed = 10;
+                    CameraManager.Instance.Movespeed = 10;
+                    encountMod -= 5;
+                }
+
                 OnEncounts?.Invoke(collider2D.GetComponent<EncountArea>().GetRandomBattler());
                 animator.SetBool("IsMoving", false);
             }
@@ -168,7 +188,7 @@ public class PlayerController : MonoBehaviour
         if (collider2D)
         {
             isSelect = true;
-            collider2D.GetComponent<IInteract>().Interact(transform);
+            collider2D.GetComponent<IStoryInteract>().StoryInteract(dialog:null);
         }
 
     }

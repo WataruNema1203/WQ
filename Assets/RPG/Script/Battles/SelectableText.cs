@@ -33,10 +33,12 @@ public class SelectableText : MonoBehaviour
         if (selected)
         {
             text.color = Color.yellow;
+            text.fontStyle = FontStyle.Bold;
         }
         else
         {
             text.color = Color.white;
+            text.fontStyle = FontStyle.Normal;
         }
     } 
 }

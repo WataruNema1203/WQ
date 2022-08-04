@@ -16,12 +16,13 @@ public class EventController : MonoBehaviour, IStoryInteract
         StartCoroutine(DialogManager.Instance.ShowDialog(dialogs.Dialogs[dialogs.GetStoryChapter()], Story));
     }
 
-
+    //キャラデータを扱うときは最初に必ずInitで初期化してから仕様（データが何もなくてエラーになる）
     void Story()
     {
         switch (dialogs.GetStoryChapter())
         {
             case 0:
+                dialogs.Battlers[dialogs.GetBattlerIndex()].Init();
                 dialogs.Player.InParty(dialogs.Battlers[dialogs.GetBattlerIndex()]);
                 dialogs.SetBattlerIndex();
                 break;

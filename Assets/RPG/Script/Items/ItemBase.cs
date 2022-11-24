@@ -10,7 +10,7 @@ public class ItemBase : ScriptableObject
 
     //　アイテムの種類
     [SerializeField]
-    public Type itemType = Type.HPRecovery;
+    public MoveType itemType = MoveType.HPRecovery;
     //　アイテムの漢字名
     [SerializeField]
     private string kanjiName = "";
@@ -26,12 +26,19 @@ public class ItemBase : ScriptableObject
     private int amount = 0;
     [SerializeField]
     private int magicAmount = 0;
+    [SerializeField]
+    private int speedAmount = 0;
     //　アイテムのゴールド
     [SerializeField]
     private int gold = 0;
+    //貴重品等のダイアログ表示テキスト
+    [SerializeField]
+    private Dialog dialog;
+
+    public Dialog Dialog { get => dialog;}
 
     //　アイテムの種類を返す
-    public Type GetItemType()
+    public MoveType GetItemType()
     {
         return itemType;
     }
@@ -59,7 +66,11 @@ public class ItemBase : ScriptableObject
     {
         return magicAmount;
     }
-    //　アイテムの強さを返す
+    public int GetSpeedAmount()
+    {
+        return speedAmount;
+    }
+    //　アイテムの金額を返す
     public int GetGold()
     {
         return gold;
@@ -87,7 +98,7 @@ public class ItemBase : ScriptableObject
     }
 }
 
-public enum Type
+public enum MoveType
 {
     HPRecovery,
     HPFullRecovery,

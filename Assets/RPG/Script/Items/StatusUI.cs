@@ -2,42 +2,32 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
+
+enum StatusState
+{
+    SelectChara,
+    ShowStatus,
+    ShowCharaImage,
+}
 
 public class StatusUI : MonoBehaviour
 {
     [SerializeField] PlayerController player;
-    [SerializeField] GameObject playerStatusUI;
-    [SerializeField] GameObject aminaStatusUI;
+    [SerializeField] GameObject statusUI;
     [SerializeField] GameObject playGorld;
-    [SerializeField] Text nameText;
-    [SerializeField] Text levelText;
-    [SerializeField] Text hpText;
-    [SerializeField] Text mpText;
-    [SerializeField] Text conditionText;
-    [SerializeField] Text attackText;
-    [SerializeField] Text defenceText;
-    [SerializeField] Text intelligenceText;
-    [SerializeField] Text mindText;
-    [SerializeField] Text expText;
-    [SerializeField] Text equipWeaponText;
-    [SerializeField] Text equipArmorText;
-    [SerializeField] Text equipAccessoryText;
-    [SerializeField] Text playTimeText;
-    [SerializeField] Text HasGorldText;
-    [SerializeField] Text aminaNameText;
-    [SerializeField] Text aminaLevelText;
-    [SerializeField] Text aminaHpText;
-    [SerializeField] Text aminaMpText;
-    [SerializeField] Text aminaConditionText;
-    [SerializeField] Text aminaAttackText;
-    [SerializeField] Text aminaDefenceText;
-    [SerializeField] Text amiaIntelligenceText;
-    [SerializeField] Text aminaMindText;
-    [SerializeField] Text aminaExpText;
-    [SerializeField] Text aminaEquipWeaponText;
-    [SerializeField] Text aminaEquipArmorText;
-    [SerializeField] Text aminaEquipAccessoryText;
+    [SerializeField] GameObject statusCharaSelect;
+    [SerializeField] GameObject statusSkillPanel;
+    [SerializeField] Image image;
+    [SerializeField] TextMeshProUGUI statusText;
+    [SerializeField] TextMeshProUGUI playTimeText;
+    [SerializeField] TextMeshProUGUI hasGoldText;
+    string statusLine;
+    public int selectedChara;
+    StatusState statusState;
 
+    StatusCharaUI[] statusCharas;
+    SkillUI[] skillSlots;
     [SerializeField]
     private int minute;
     [SerializeField]
@@ -46,107 +36,139 @@ public class StatusUI : MonoBehaviour
     private float oldSeconds;
     //　タイマー表示用テキスト
     private string timerText;
-    Text[] playerTexts;
-    Text[] aminaTexts;
     Color dei = Color.red;
     Color alive = Color.white;
+    Color show = new Color(255, 255, 255, 255);
+    Color showOff;
+    //覚える技
+    public List<Move> Moves { get; set; }
+    //現在の技
+    public Move CurrentMove { get; set; }
 
-    private void Awake()
+
+    internal StatusState StatusState { get => statusState;}
+    public StatusCharaUI[] StatusCharas { get => statusCharas;}
+
+    public void Init()
     {
-        playerTexts = playerStatusUI.GetComponentsInChildren<Text>();
-        aminaTexts = aminaStatusUI.GetComponentsInChildren<Text>();
+        statusCharas = GetComponentsInChildren<StatusCharaUI>();
+
+        StatusCharaShow();
     }
 
-    private void Init()
+    public void SkillInit()
     {
-        if (player.Battlers[0].HP <= 0)
+        skillSlots = GetComponentsInChildren<SkillUI>();
+
+        //覚える技から使える技を生成
+        Moves = new List<Move>(21);
+        foreach (var learnableMove in player.Battlers[selectedChara].Base.LearnableMoves)
         {
-            for (int i = 0; i < playerTexts.Length; i++)
+            if (learnableMove.Level <= player.Battlers[selectedChara].Level)
             {
-                playerTexts[i].color = dei;
+                Moves.Add(new Move(learnableMove.MoveBase));
             }
         }
-        else if ((player.Battlers[0].HP >= 0))
+
+        SkillShow();
+    }
+
+
+    void StatusCharaShow()
+    {
+        for (int i = 0; i < statusCharas.Length; i++)
         {
-            for (int i = 0; i < playerTexts.Length; i++)
+            if (i == 0)
             {
-                playerTexts[i].color = alive;
+                statusCharas[i].SetText($"{player.Battlers[i].Base.Name}");
             }
-        }
-        if (player.Battlers.Count == 2)
-        {
-            if (player.Battlers[1].HP <= 0)
+            else if (i == 1)
             {
-                for (int i = 0; i < aminaTexts.Length; i++)
+                if (player.Battlers.Count == 2)
                 {
-                    aminaTexts[i].color = dei;
+                    statusCharas[i].SetText($"{player.Battlers[i].Base.Name}");
                 }
-            }
-            else if ((player.Battlers[1].HP >= 0))
-            {
-                for (int i = 0; i < aminaTexts.Length; i++)
+                else
                 {
-                    aminaTexts[i].color = alive;
+                    statusCharas[i].SetText("-");
                 }
             }
 
         }
-        playerStatusUI.transform.Find("NameText").GetComponent<Text>().text = $"名前：{ player.Battlers[0].Base.Name}";
-        //nameText.text = "";
-        levelText.text = $"レベル：{player.Battlers[0].Level}";
-        hpText.text = $"HP：{ player.Battlers[0].HP}/{player.Battlers[0].MaxHP}";
-        mpText.text = $"MP：{ player.Battlers[0].MP}/{player.Battlers[0].MaxMP}";
-        if (player.Battlers[0].HP <= 0)
+    }
+
+    void SkillShow()
+    {
+        for (int i = 0; i < skillSlots.Length; i++)
         {
-            conditionText.text = "状態：死亡";
+            if (Moves.Count <= skillSlots.Length)
+            {
+                Moves.Add(null);
+            }
         }
-        else if (player.Battlers[0].Status == null)
+        for (int i = 0; i < skillSlots.Length; i++)
         {
-            conditionText.text = "状態：正常";
+
+            if (Moves[i] == null)
+            {
+                skillSlots[i].SetText($" ");
+
+            }
+            else if (Moves[i].Base.Category1 == MoveCategory1.Skill || Moves[i].Base.Category1 == MoveCategory1.Stat || Moves[i].Base.Category1 == MoveCategory1.Physical)
+            {
+                skillSlots[i].SetText($"{Moves[i].Base.Name} ");
+
+            }
+            else if (Moves[i].Base == true)
+            {
+                skillSlots[i].SetText($"{Moves[i].Base.Name} ");
+
+            }
+        }
+    }
+
+
+
+    private void StatusInit()
+    {
+        if (player.Battlers[selectedChara].isDai)
+        {
+            statusText.color = dei;
+        }
+        else if ((!player.Battlers[selectedChara].isDai))
+        {
+            statusText.color = alive;
+        }
+        statusLine = "";
+        hasGoldText.text = $"所持G：{player.Battlers[0].Gold}";
+        image.sprite = player.Battlers[selectedChara].Base.Sprite;
+        statusLine = "";
+        statusLine = $"名前：{ player.Battlers[selectedChara].Base.Name}\n";
+        statusLine += $"レベル：{player.Battlers[selectedChara].Level}\n";
+        statusLine += $"HP：{ player.Battlers[selectedChara].HP}/{player.Battlers[selectedChara].MaxHP}\n";
+        statusLine += $"MP：{ player.Battlers[selectedChara].MP}/{player.Battlers[selectedChara].MaxMP}\n";
+        if (player.Battlers[selectedChara].HP <= 0)
+        {
+            statusLine += "状態：死亡\n";
+        }
+        else if (player.Battlers[selectedChara].Status == null)
+        {
+            statusLine += "状態：正常\n";
         }
         else
         {
-            conditionText.text = $"状態：{player.Battlers[0].Status.Name}";
+            statusLine += $"状態：{player.Battlers[selectedChara].Status.Name}\n";
         }
-        attackText.text = $"攻撃力：{player.Battlers[0].Attack + player.Battlers[0].Base.GetEquipWeapon().Base.GetAmount() + player.Battlers[0].Base.GetEquipAccessory().Base.GetAmount()}";
-        defenceText.text = $"防御力：{ player.Battlers[0].Defense + player.Battlers[0].Base.GetEquipArmor().Base.GetAmount()}";
-        intelligenceText.text = $"魔法力：{player.Battlers[0].Intelligence + player.Battlers[0].Base.GetEquipWeapon().Base.GetMagicAmount() + player.Battlers[0].Base.GetEquipAccessory().Base.GetMagicAmount()}";
-        mindText.text = $"精神力：{ player.Battlers[0].Mind + player.Battlers[0].Base.GetEquipArmor().Base.GetMagicAmount()}";
-        expText.text = $"次のLvまで：{ ((400 * player.Battlers[0].Level * player.Battlers[0].Level / (204 - player.Battlers[0].Level)) + 5) - player.Battlers[0].HasExp}";
-        equipWeaponText.text = $"武器：{player.Battlers[0].Base.GetEquipWeapon().Base.GetKanjiName()}";
-        equipArmorText.text = $"防具：{player.Battlers[0].Base.GetEquipArmor().Base.GetKanjiName()}";
-        equipAccessoryText.text = $"装飾品：{player.Battlers[0].Base.GetEquipAccessory().Base.GetKanjiName()}";
-        HasGorldText.text = $"所持G：{player.Battlers[0].Gold}";
-
-        if (player.Battlers.Count == 2)
-        {
-            aminaStatusUI.SetActive(true);
-
-            aminaNameText.text = $"名前：{ player.Battlers[1].Base.Name}";
-            aminaLevelText.text = $"レベル：{player.Battlers[1].Level}";
-            aminaHpText.text = $"HP：{ player.Battlers[1].HP}/{player.Battlers[1].MaxHP}";
-            aminaMpText.text = $"MP：{ player.Battlers[1].MP}/{player.Battlers[1].MaxMP}";
-            if (player.Battlers[1].HP <= 0)
-            {
-                aminaConditionText.text = "状態：死亡";
-            }
-            else if (player.Battlers[1].Status == null)
-            {
-                aminaConditionText.text = "状態：正常";
-            }
-            else
-            {
-                aminaConditionText.text = $"状態：{player.Battlers[1].Status.Name}";
-            }
-            aminaAttackText.text = $"攻撃力：{player.Battlers[1].Attack + player.Battlers[1].Base.GetEquipWeapon().Base.GetAmount() + player.Battlers[1].Base.GetEquipAccessory().Base.GetAmount()}";
-            aminaDefenceText.text = $"防御力：{ player.Battlers[1].Defense + player.Battlers[1].Base.GetEquipArmor().Base.GetAmount()}";
-            amiaIntelligenceText.text = $"魔法力：{player.Battlers[1].Intelligence + player.Battlers[1].Base.GetEquipWeapon().Base.GetMagicAmount() + player.Battlers[1].Base.GetEquipAccessory().Base.GetMagicAmount()}";
-            aminaMindText.text = $"精神力：{ player.Battlers[1].Mind + player.Battlers[1].Base.GetEquipArmor().Base.GetMagicAmount()}";
-            aminaExpText.text = $"次のLvまで：{ ((400 * player.Battlers[1].Level * player.Battlers[1].Level / (204 - player.Battlers[1].Level)) + 5) - player.Battlers[1].HasExp}";
-            aminaEquipWeaponText.text = $"武器：{player.Battlers[1].Base.GetEquipWeapon().Base.GetKanjiName()}";
-            aminaEquipArmorText.text = $"防具：{player.Battlers[1].Base.GetEquipArmor().Base.GetKanjiName()}";
-            aminaEquipAccessoryText.text = $"装飾品：{player.Battlers[1].Base.GetEquipAccessory().Base.GetKanjiName()}";
-        }
+        statusLine += $"攻撃力：{player.Battlers[selectedChara].Attack + player.Battlers[selectedChara].Base.GetEquipWeapon().Base.GetAmount() + player.Battlers[selectedChara].Base.GetEquipAccessory().Base.GetAmount()}\n";
+        statusLine += $"防御力：{ player.Battlers[selectedChara].Defense + player.Battlers[selectedChara].Base.GetEquipArmor().Base.GetAmount()}\n";
+        statusLine += $"魔法力：{player.Battlers[selectedChara].Intelligence + player.Battlers[selectedChara].Base.GetEquipWeapon().Base.GetMagicAmount() + player.Battlers[selectedChara].Base.GetEquipAccessory().Base.GetMagicAmount()}\n";
+        statusLine += $"精神力：{ player.Battlers[selectedChara].Mind + player.Battlers[selectedChara].Base.GetEquipArmor().Base.GetMagicAmount()}\n";
+        statusLine += $"素早さ：{ player.Battlers[selectedChara].Speed + player.Battlers[selectedChara].Base.GetEquipArmor().Base.GetSpeedAmount() + player.Battlers[selectedChara].Base.GetEquipAccessory().Base.GetSpeedAmount()}\n";
+        statusLine += $"次のLvまで：{ ((400 * player.Battlers[selectedChara].Level * player.Battlers[selectedChara].Level / (204 - player.Battlers[selectedChara].Level)) + 5) - player.Battlers[selectedChara].HasExp}\n";
+        statusLine += $"武器：{player.Battlers[selectedChara].Base.GetEquipWeapon().Base.GetKanjiName()}\n";
+        statusLine += $"防具：{player.Battlers[selectedChara].Base.GetEquipArmor().Base.GetKanjiName()}\n";
+        statusLine += $"装飾品：{player.Battlers[selectedChara].Base.GetEquipAccessory().Base.GetKanjiName()}";
+        statusText.text = statusLine;
 
     }
     private void Update()
@@ -170,73 +192,43 @@ public class StatusUI : MonoBehaviour
 
     public void Open()
     {
-        playerStatusUI.SetActive(true);
-        playGorld.SetActive(true);
-        if (player.Battlers.Count == 2)
-        {
-            aminaStatusUI.SetActive(true);
-        }
+        statusState = StatusState.SelectChara;
+        statusCharaSelect.SetActive(true);
         Init();
     }
     public void Close()
     {
-        playerStatusUI.SetActive(false);
+        statusCharaSelect.SetActive(false);
+    }
+    public void StatusOpen()
+    {
+        statusState = StatusState.ShowStatus;
+        statusSkillPanel.SetActive(true);
+        statusUI.SetActive(true);
+        playGorld.SetActive(true);
+        StatusInit();
+        SkillInit();
+    }
+    public void StatusClose()
+    {
+        statusUI.SetActive(false);
         playGorld.SetActive(false);
-        if (player.Battlers.Count == 2)
-        {
-            aminaStatusUI.SetActive(false);
-        }
+        statusSkillPanel.SetActive(false);
+        Open();
     }
 
-    public void Set(Battler battler)
+    public void TextClose()
     {
-        nameText.text = battler.Base.Name;
-        UpdateUI(battler);
+        statusState = StatusState.ShowCharaImage;
+        statusText.gameObject.SetActive(false);
+        showOff = image.color;
+        image.color = show;
     }
-    public void AminaSet(Battler battler)
+
+    public void TextOpen()
     {
-        aminaNameText.text = battler.Base.Name;
-        AminaUpdateUI(battler);
+        statusState = StatusState.ShowStatus;
+        statusText.gameObject.SetActive(true);
+        image.color = showOff;
     }
-
-    public void UpdateUI(Battler battler)
-    {
-        levelText.text = battler.Level.ToString();
-        hpText.text = $"{battler.HP}/{battler.MaxHP}";
-        mpText.text = $"{battler.MP}/{battler.MaxMP}";
-        if (battler.HP <= 0)
-        {
-            conditionText.text = "状態：死亡";
-        }
-        else if (battler.Status == null)
-        {
-            conditionText.text = "状態：正常";
-        }
-        else
-        {
-            conditionText.text = $"状態：{battler.Status.Name}";
-        }
-    }
-
-    public void AminaUpdateUI(Battler battler)
-    {
-        aminaLevelText.text = battler.Level.ToString();
-        aminaHpText.text = $"{battler.HP}/{battler.MaxHP}";
-        aminaMpText.text = $"{battler.MP}/{battler.MaxMP}";
-        if (battler.HP <= 0)
-        {
-            aminaConditionText.text = "状態：死亡";
-        }
-        else if (battler.Status == null)
-        {
-            aminaConditionText.text = "状態：正常";
-        }
-        else
-        {
-            aminaConditionText.text = $"状態：{battler.Status.Name}";
-        }
-
-    }
-
-
 }

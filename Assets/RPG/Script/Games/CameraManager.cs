@@ -1,20 +1,21 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Animations;
+using System;
 
 public class CameraManager : MonoBehaviour
 {
-    [SerializeField] PlayerController player;
-    [SerializeField] GameObject clampObj;
+    [SerializeField] GameObject targetObj;
     Vector3 defaultPosition;
     float movespeed = 5;
     public static CameraManager Instance { get; private set; }
+    [SerializeField]bool isEvent;
 
 
-    Vector3 max;
-    Vector3 min;
 
     public float Movespeed { get => movespeed; set => movespeed = value; }
+    public bool IsEvent { get => isEvent; set => isEvent = value; }
 
     private void Awake()
     {
@@ -27,18 +28,20 @@ public class CameraManager : MonoBehaviour
     private void Start()
     {
         defaultPosition = transform.position;
-        max = clampObj.GetComponent<Renderer>().bounds.max;
-        min = clampObj.GetComponent<Renderer>().bounds.min;
     }
 
-    private void Update()
+    public void SetTarget(GameObject cameraTarget)
     {
-        max = clampObj.GetComponent<Renderer>().bounds.max;
-        min = clampObj.GetComponent<Renderer>().bounds.min;
-        Vector3 vector3 = player.transform.position;
-        vector3.z = defaultPosition.z;
-        vector3.x = Mathf.Clamp(vector3.x, min.x, max.x);
-        vector3.y = Mathf.Clamp(vector3.y, min.y, max.y);
-        transform.position = Vector3.MoveTowards(transform.position, vector3, Time.deltaTime * movespeed);
+        targetObj = cameraTarget;
+    }
+
+    private void LateUpdate()
+    {
+        if (!isEvent)
+        {
+            Vector3 vector3 = targetObj.transform.position;
+            vector3.z = defaultPosition.z - 10f;
+            transform.position = vector3;
+        }
     }
 }

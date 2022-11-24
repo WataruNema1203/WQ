@@ -6,6 +6,7 @@ using UnityEngine;
 public class BattlerBase : ScriptableObject
 {
     //Battler‚ÌŠî‘bƒf[ƒ^
+    [SerializeField] CharaTypes charaTypes;
     [SerializeField] new string name;
     [SerializeField] float maxHP;
     [SerializeField] float maxMP;
@@ -13,6 +14,7 @@ public class BattlerBase : ScriptableObject
     [SerializeField] float inte;
     [SerializeField] float def;
     [SerializeField] float mnd;
+    [SerializeField] float spd;
     [SerializeField] Sprite sprite;
     [SerializeField] List<LearnableMove> learnableMoves;
     [SerializeField] int exp;
@@ -80,7 +82,8 @@ public class BattlerBase : ScriptableObject
     public DropItem1 DropItem1 { get => dropItem1; }
     public DropItem2 DropItem2 { get => dropItem2; }
     public int Gold { get => gold; }
-
+    public CharaTypes CharaTypes { get => charaTypes;}
+    public float Spd { get => spd; }
 }
 
 public enum Stat
@@ -89,6 +92,7 @@ public enum Stat
     Defense,
     Intelligence,
     Mind,
+    Speed,
 }
 
 [System.Serializable]
@@ -108,4 +112,21 @@ public class DropItem2
 
     public Item DropItem { get => dropItem;}
     public int Chance { get => chance; }
+}
+
+[System.Serializable]
+public class CharaTypes
+{
+    [SerializeField] int enemyNumber;
+    [SerializeField] CharaType chara;
+
+    public int EnemyNumber { get => enemyNumber; }
+    internal CharaType Chara { get => chara;}
+}
+
+enum CharaType
+{
+    Player,
+    Amina,
+    Enemy,
 }

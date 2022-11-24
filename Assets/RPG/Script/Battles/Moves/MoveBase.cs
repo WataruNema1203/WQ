@@ -51,16 +51,19 @@ public enum MoveCategory1
     Heal,
     FullHeal,
     Resuscitation,
-    Field,
+    FieldSkill,
     Stat,
+    All,
 }
 
 public enum MoveCategory2
 {
-    Physical,
-    Skill,
+    None,
     Heal,
-    Stat,
+    FullHeal,
+    Resuscitation,
+    EncountSkill,
+    Warp,
 }
 
 public enum MoveTarget

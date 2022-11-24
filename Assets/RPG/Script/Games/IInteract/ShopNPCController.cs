@@ -1,39 +1,28 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.Events;
 
 public class ShopNPCController : MonoBehaviour, IInteract
 {
-    [SerializeField] Dialog dialog;
+    [SerializeField] ShopNPC shopNPC;
+    public UnityAction<List<Item>,int> OnShopStart;
 
-    Animator animator;
-    public UnityAction OnShopStart;
-
-
-
-    void Awake()
-    {
-        animator = GetComponent<Animator>();
-    }
-
+    public ShopNPC ShopNPC { get => shopNPC;}
 
     public void Interact(Transform trf)
     {
-        LookToward(trf.position);
-        StartCoroutine(DialogManager.Instance.ShowDialog(dialog, OnShopStart));
-    }
-
-
-    public void LookToward(Vector3 targetPos)
-    {
-        float xDiff = Mathf.Floor(targetPos.x) - Mathf.Floor(transform.position.x);
-        float yDiff = Mathf.Floor(targetPos.y) - Mathf.Floor(transform.position.y);
-
-        if (xDiff == 0 || yDiff == 0)
+        int index = 0;
+        for (int i = 0; i < GameController.Instance.ShopNPCs.Length; i++)
         {
-            animator.SetFloat("x", Mathf.Clamp(xDiff, -1f, 1f));
-            animator.SetFloat("y", Mathf.Clamp(yDiff, -1f, 1f));
+            if (GameController.Instance.ShopNPCs[i].shopNPC.Base.Name== shopNPC.Base.Name)
+            {
+                index = i;
+            }
+            
         }
+        StartCoroutine(DialogManager.Instance.ShopShowDialog(shopNPC.Base.Dialog,shopNPC.Base.Items,index,OnShopStart));
     }
+
 }

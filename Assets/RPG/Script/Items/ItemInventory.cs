@@ -13,19 +13,19 @@ public class ItemInventory : MonoBehaviour
 
     public void Use(Item item,int selectIndex)
     {
-        if (item.Base.GetItemType() == Type.HPRecovery)
+        if (item.Base.GetItemType() == MoveType.HPRecovery)
         {
             item.Base.RecoveryHP(player.Battlers[selectIndex]);
         }
-        else if (item.Base.GetItemType() == Type.MPRecovery)
+        else if (item.Base.GetItemType() == MoveType.MPRecovery)
         {
             item.Base.RecoveryMP(player.Battlers[selectIndex]);
         }
-        else if (item.Base.GetItemType() == Type.HPFullRecovery)
+        else if (item.Base.GetItemType() == MoveType.HPFullRecovery)
         {
             item.Base.RecoveryFullHP(player.Battlers[selectIndex]);
         }
-        else if (item.Base.GetItemType() == Type.MPFullRecovery)
+        else if (item.Base.GetItemType() == MoveType.MPFullRecovery)
         {
             item.Base.RecoveryFullMP(player.Battlers[selectIndex]);
         }

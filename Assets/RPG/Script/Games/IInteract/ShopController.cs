@@ -30,7 +30,7 @@ public class ShopController : MonoBehaviour
     [SerializeField] Text itemAmountText;
     [SerializeField] Text hasGoldText;
     [SerializeField] Text possessionText;
-    [SerializeField] List<Item> items = new List<Item>();
+    List<Item> items = new List<Item>();
     [SerializeField] GameObject shopValuePanel;
     [SerializeField] Text itemSumText;
     [SerializeField] Text itemSumGoldText;
@@ -41,6 +41,7 @@ public class ShopController : MonoBehaviour
     int selectedItem;
     int selectedBuyChara;
     int sumItem=0;
+    int shopNpcIndex;
     ItemUI[] itemSlots;
     SelectableText[] itemCharas;
     SelectableText[] buyCharas;
@@ -59,6 +60,7 @@ public class ShopController : MonoBehaviour
     public Text HasGoldText { get => hasGoldText; set => hasGoldText = value; }
     public int SumItem { get => sumItem; set => sumItem = value; }
     public int SelectedBuyChara { get => selectedBuyChara;}
+    public int ShopNpcIndex { get => shopNpcIndex;}
 
     public UnityAction<Item,int> OnBuyItem;
     public UnityAction<Item,int> OnSellItem;
@@ -443,7 +445,6 @@ public class ShopController : MonoBehaviour
     public void BuyInit()
     {
         state = ShopState.Buy;
-        Debug.Log("買取初期化");
         sumItem = 0;
         itemSumGoldText.text = "合計：";
         itemSumText.text = "購入個数：0";
@@ -451,14 +452,15 @@ public class ShopController : MonoBehaviour
     public void SellInit()
     {
         state = ShopState.Sell;
-        Debug.Log("売却初期化");
         sumItem = 0;
         itemSumGoldText.text = "合計：";
         itemSumText.text = "売却個数：0";
     }
-    public void SelectActionOpen()
+    public void SelectActionOpen(List<Item> item,int index)
     {
         selectActionPanel.SetActive(true);
+        shopNpcIndex = index;
+        items = item;
         SelectActionInit();
     }
 
@@ -477,7 +479,7 @@ public class ShopController : MonoBehaviour
         ShopPanel.SetActive(false);
         shopStatusPanel.SetActive(false);
         StartCoroutine(DialogManager.Instance.FieldTypeDialog("まだ何か取引するかい？"));
-        SelectActionOpen();
+        SelectActionOpen(this.items,shopNpcIndex);
     }
     public void BuyCharaOpen()
     {
@@ -508,7 +510,7 @@ public class ShopController : MonoBehaviour
     public void SelectSellCharaClose()
     {
         selectSellCharaPanel.SetActive(false);
-        SelectActionOpen();
+        SelectActionOpen(this.items,shopNpcIndex);
         StartCoroutine(DialogManager.Instance.FieldTypeDialog("まだ何か取引するかい？"));
     }
     public void SelectSellItemTypeOpen()

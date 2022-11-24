@@ -1,8 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Events;
+using TMPro;
 using System.Linq;
 using System;
 enum ItemStatus
@@ -11,6 +11,7 @@ enum ItemStatus
     ItemTypeSelect,
     ItemSelect,
     ItemUseCharaSelect,
+    Busy,
 }
 
 public class InventoryUI : MonoBehaviour
@@ -22,8 +23,8 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] GameObject itemPanel;
     [SerializeField] GameObject itemUseCharaPanel;
     [SerializeField] InventoryStatusUI inventoryStatusUI;
-    [SerializeField] Text informationText;
-    [SerializeField] Text informationValueText;
+    [SerializeField] TextMeshProUGUI informationText;
+    [SerializeField] TextMeshProUGUI informationValueText;
     [SerializeField] PlayerController player;
     public UnityAction OnUsedItem;
     public UnityAction OnSelectStart;
@@ -83,13 +84,13 @@ public class InventoryUI : MonoBehaviour
         {
             if (i == 0)
             {
-                itemCharas[i].SetText("主人公");
+                itemCharas[i].SetText($"{player.Battlers[i].Base.Name}");
             }
             else if (i == 1)
             {
                 if (player.Battlers.Count == 2)
                 {
-                    itemCharas[i].SetText("アミナ");
+                    itemCharas[i].SetText($"{player.Battlers[i].Base.Name}");
                 }
                 else
                 {
@@ -125,12 +126,12 @@ public class InventoryUI : MonoBehaviour
             {
 
                 itemSlots[i].SetText("-");
-                itemSlots[i].transform.Find("PosessionText").GetComponent<Text>().text = "";
+                itemSlots[i].transform.Find("PosessionText").GetComponent<TextMeshProUGUI>().text = "";
             }
             else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetKanjiName() != "未所持")
             {
                 itemSlots[i].SetText($"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetKanjiName()}");
-                itemSlots[i].transform.Find("PosessionText").GetComponent<Text>().text = "× " + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].possession}";
+                itemSlots[i].transform.Find("PosessionText").GetComponent<TextMeshProUGUI>().text = "× " + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].possession}";
             }
 
         }
@@ -141,13 +142,13 @@ public class InventoryUI : MonoBehaviour
         {
             if (i == 0)
             {
-                itemUses[i].SetText("主人公");
+                itemUses[i].SetText($"{player.Battlers[i].Base.Name}");
             }
             else if (i == 1)
             {
                 if (player.Battlers.Count == 2)
                 {
-                    itemUses[i].SetText("アミナ");
+                    itemUses[i].SetText($"{player.Battlers[i].Base.Name}");
                 }
                 else
                 {
@@ -275,7 +276,7 @@ public class InventoryUI : MonoBehaviour
                         descriptionPanel.SetActive(true);
                         if (selectedItemType == 1)
                         {
-                            if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetItemType() == Type.Weapon)
+                            if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetItemType() == MoveType.Weapon)
                             {
                                 informationText.text = inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetInformation();
                                 informationValueText.text = "攻撃力：" + $"{inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[i].item.Base.GetAmount()}";
@@ -356,7 +357,7 @@ public class InventoryUI : MonoBehaviour
         else
         {
             Item useItem = inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item;
-            if (useItem.Base.itemType == Type.LowContinuation)
+            if (useItem.Base.itemType == MoveType.LowContinuation)
             {
                 if (player.Battlers[selectedItemUseChara].Status == null)
                 {
@@ -389,7 +390,7 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.itemType == Type.LowContinuation)
+            else if (useItem.Base.itemType == MoveType.LowContinuation)
             {
                 if (player.Battlers[selectedItemUseChara].Status == null)
                 {
@@ -423,7 +424,7 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.itemType == Type.Barn)
+            else if (useItem.Base.itemType == MoveType.Barn)
             {
                 if (player.Battlers[selectedItemUseChara].Status == null)
                 {
@@ -456,7 +457,7 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.itemType == Type.Binding)
+            else if (useItem.Base.itemType == MoveType.Binding)
             {
                 if (player.Battlers[selectedItemUseChara].Status == null)
                 {
@@ -489,7 +490,7 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.itemType == Type.Freeze)
+            else if (useItem.Base.itemType == MoveType.Freeze)
             {
                 if (player.Battlers[selectedItemUseChara].Status == null)
                 {
@@ -522,7 +523,7 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.itemType == Type.Paralisis)
+            else if (useItem.Base.itemType == MoveType.Paralisis)
             {
                 if (player.Battlers[selectedItemUseChara].Status == null)
                 {
@@ -555,9 +556,9 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.HPFullRecovery)
+            else if (useItem.Base.GetItemType() == MoveType.HPFullRecovery)
             {
-                if (player.Battlers[selectedItemUseChara].MP == player.Battlers[selectedItemUseChara].MaxMP)
+                if (player.Battlers[selectedItemUseChara].MP >= player.Battlers[selectedItemUseChara].MaxMP)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -590,9 +591,9 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.MPFullRecovery)
+            else if (useItem.Base.GetItemType() == MoveType.MPFullRecovery)
             {
-                if (player.Battlers[selectedItemUseChara].HP == player.Battlers[selectedItemUseChara].MaxHP)
+                if (player.Battlers[selectedItemUseChara].HP >= player.Battlers[selectedItemUseChara].MaxHP)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -625,7 +626,7 @@ public class InventoryUI : MonoBehaviour
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.Weapon || useItem.Base.GetItemType() == Type.Armor || useItem.Base.GetItemType() == Type.Accessory)
+            else if (useItem.Base.GetItemType() == MoveType.Weapon || useItem.Base.GetItemType() == MoveType.Armor || useItem.Base.GetItemType() == MoveType.Accessory)
             {
                 inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession--;
                 yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を装備した"));
@@ -646,9 +647,9 @@ public class InventoryUI : MonoBehaviour
                 }
                 DialogManager.Instance.Close();
             }
-            else if (useItem.Base.GetItemType() == Type.HPRecovery)
+            else if (useItem.Base.GetItemType() == MoveType.HPRecovery)
             {
-                if (player.Battlers[selectedItemUseChara].HP == player.Battlers[selectedItemUseChara].MaxHP)
+                if (player.Battlers[selectedItemUseChara].HP >= player.Battlers[selectedItemUseChara].MaxHP)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -669,19 +670,21 @@ public class InventoryUI : MonoBehaviour
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                     if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
                     {
-                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem] = null;
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
                     }
                     else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
                     {
                         descriptionPanel.SetActive(false);
-                        OnUsedItemKeep?.Invoke();
+                        OnUsedItem?.Invoke();
                     }
                     DialogManager.Instance.Close();
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.MPRecovery)
+            else if (useItem.Base.GetItemType() == MoveType.MPRecovery)
             {
-                if (player.Battlers[selectedItemUseChara].MP == player.Battlers[selectedItemUseChara].MaxMP)
+                if (player.Battlers[selectedItemUseChara].MP >= player.Battlers[selectedItemUseChara].MaxMP)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}は使わなくていい！"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -702,20 +705,38 @@ public class InventoryUI : MonoBehaviour
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                     if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession <= 0)
                     {
-                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem] = null;
+                        inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].item = inventory.NoneItem;
+                        descriptionPanel.SetActive(false);
+                        OnUsedItem?.Invoke();
                     }
                     else if (inventory.ItemCharas[selectedChara].ItemTypes[selectedItemType].Items[selectedItem].possession > 0)
                     {
                         descriptionPanel.SetActive(false);
-                        OnUsedItemKeep?.Invoke();
+                        OnUsedItem?.Invoke();
                     }
                     DialogManager.Instance.Close();
                 }
             }
+            else if (useItem.Base.GetItemType() == MoveType.Valuables)
+            {
+                ItemShow();
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{useItem.Base.GetKanjiName()}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                DialogManager.Instance.Close();
+                for (int i = 0; i < inventory.ItemCharas[selectedItem].ItemTypes[selectedItemType].Items[selectedItem].item.Base.Dialog.Lines.Count; i++)
+                {
+                    yield return StartCoroutine(DialogManager.Instance.ItemShowDialog(inventory.ItemCharas[selectedItem].ItemTypes[selectedItemType].Items[selectedItem].item.Base.Dialog.Lines[i].Log));
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                }
+                descriptionPanel.SetActive(false);
+                OnUsedItem?.Invoke();
+                DialogManager.Instance.Close();
+            }
+
         }
     }
 
-    public IEnumerator UseInBattle(int selectChara,int selectItem,int selectUseChara)
+    public IEnumerator UseInBattle(int selectChara, int selectItem, int selectUseChara)
     {
         if (inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item.Base.GetKanjiName() == "未所持")
         {
@@ -729,7 +750,7 @@ public class InventoryUI : MonoBehaviour
         else
         {
             Item useItem = inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item;
-            if (useItem.Base.GetItemType() == Type.LowContinuation)
+            if (useItem.Base.GetItemType() == MoveType.LowContinuation)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -745,7 +766,7 @@ public class InventoryUI : MonoBehaviour
                 }
 
             }
-            else if (useItem.Base.GetItemType() == Type.HighContinuation)
+            else if (useItem.Base.GetItemType() == MoveType.HighContinuation)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -760,7 +781,7 @@ public class InventoryUI : MonoBehaviour
                     inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.Barn)
+            else if (useItem.Base.GetItemType() == MoveType.Barn)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -775,7 +796,7 @@ public class InventoryUI : MonoBehaviour
                     inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.Binding)
+            else if (useItem.Base.GetItemType() == MoveType.Binding)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -790,7 +811,7 @@ public class InventoryUI : MonoBehaviour
                     inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.Freeze)
+            else if (useItem.Base.GetItemType() == MoveType.Freeze)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -805,7 +826,7 @@ public class InventoryUI : MonoBehaviour
                     inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.Paralisis)
+            else if (useItem.Base.GetItemType() == MoveType.Paralisis)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -820,7 +841,7 @@ public class InventoryUI : MonoBehaviour
                     inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].item = inventory.NoneItem;
                 }
             }
-            else if (useItem.Base.GetItemType() == Type.HPFullRecovery || useItem.Base.GetItemType() == Type.MPFullRecovery)
+            else if (useItem.Base.GetItemType() == MoveType.HPFullRecovery || useItem.Base.GetItemType() == MoveType.MPFullRecovery)
             {
                 inventory.ItemCharas[selectChara].ItemTypes[selectedItemType].Items[selectItem].possession--;
                 ItemShow();
@@ -828,11 +849,11 @@ public class InventoryUI : MonoBehaviour
                 yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 inventory.Use(useItem, selectUseChara);
                 inventoryStatusUI.PlayerUpdateUI(player.Battlers[selectUseChara]);
-                if (useItem.Base.GetItemType() == Type.HPFullRecovery)
+                if (useItem.Base.GetItemType() == MoveType.HPFullRecovery)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectUseChara].MaxHP}ポイント回復した"));
                 }
-                else if (useItem.Base.GetItemType() == Type.MPFullRecovery)
+                else if (useItem.Base.GetItemType() == MoveType.MPFullRecovery)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectUseChara].MaxMP}ポイント回復した"));
                 }

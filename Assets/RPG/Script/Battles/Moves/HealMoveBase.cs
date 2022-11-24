@@ -15,12 +15,25 @@ public class HealMoveBase : MoveBase
     {
         if (full == true)
         {
+            Heal(attacker, target, damage);
+            return $"{attacker.Name}‚Ì{Name}\n{attacker.Name}‚Í{attacker.MaxHP}‰ñ•œ";
+        }
+        else
+        {
+            Heal(attacker, target, damage);
+            return $"{attacker.Name}‚Ì{Name}\n{attacker.Name}‚Í{healPoint + 1}‰ñ•œ";
+
+        }
+    }
+
+    private void Heal(Battler attacker, Battler target, int damage)
+    {
+        if (full == true)
+        {
             attacker.HP += damage;
             attacker.Heal(attacker.MaxHP);
             int fullHeal = attacker.MaxHP;
             attacker.HP = Mathf.Clamp(attacker.HP + fullHeal, 0, attacker.MaxHP);
-            return $"{attacker.Base.Name}‚Ì{Name}\n{attacker.Base.Name}‚Í{fullHeal}‰ñ•œ";
-
         }
         else
         {
@@ -30,8 +43,7 @@ public class HealMoveBase : MoveBase
             float d = (a * HealPoint) + attacker.Intelligence + 2;
             int healPoint = Mathf.FloorToInt(d * modifiers);
             attacker.HP = Mathf.Clamp(attacker.HP + healPoint, 0, attacker.MaxHP);
-            return $"{attacker.Base.Name}‚Ì{Name}\n{attacker.Base.Name}‚Í{healPoint+1}‰ñ•œ";
-
         }
+
     }
 }

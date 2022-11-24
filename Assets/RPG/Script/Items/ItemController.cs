@@ -17,7 +17,6 @@ public class ItemController : MonoBehaviour
 {
     [SerializeField] MenuSelectionUI menuSelectionUI;
     [SerializeField] StatusUI statusUI;
-    [SerializeField] GameObject ItemMenu;
 
     MenuState state;
 
@@ -27,8 +26,7 @@ public class ItemController : MonoBehaviour
 
     public MenuSelectionUI MenuSelectionUI { get => menuSelectionUI; }
     public StatusUI StatusUI { get => statusUI;}
-    public GameObject ItemMenu1 { get => ItemMenu;}
-    internal MenuState State { get => state; set => state = value; }
+     internal MenuState State { get => state; set => state = value; }
 
     public void HandleUpdate()
     {
@@ -40,6 +38,7 @@ public class ItemController : MonoBehaviour
     public void MenuSelection()
     {
         state = MenuState.SelectStart;
+        menuSelectionUI.gameObject.SetActive(true);
         menuSelectionUI.Open();
         menuSelectionUI.Init();
     }
@@ -62,14 +61,13 @@ public class ItemController : MonoBehaviour
 
     public void Open()
     {
-        ItemMenu.SetActive(true);
         MenuSelection();
 
     }
 
     public void Close()
     {
-        ItemMenu.SetActive(false);
+        menuSelectionUI.gameObject.SetActive(false);
     }
 }
 

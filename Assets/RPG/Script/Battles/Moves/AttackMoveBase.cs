@@ -7,10 +7,9 @@ using UnityEngine;
 public class AttackMoveBase : MoveBase
 {
 
-    public override string RunMoveResult(Battler attacker, Battler target,int damage)
+    public override string RunMoveResult(Battler attacker, Battler target, int damage)
     {
-
-        return $"{attacker.Base.Name}の{Name}\n{target.Base.Name}は{damage}のダメージ";
+            return $"{attacker.Name}の{Name}\n{target.Name}は{damage}のダメージ";
     }
 
 }

@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class ItemCharaUI : SelectableText
 {
-
+    
     public bool IsEmpty
     {
         get => base.text.text == "-";

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Fungus;
 using UnityEngine.UI;
 
 
@@ -16,6 +17,7 @@ enum GameState
     Shop,
     ShowDialog,
     Busy,
+    Event,
     Ending,
 }
 
@@ -23,18 +25,30 @@ public class GameController : MonoBehaviour
 {
     [SerializeField] PlayerController player;
     [SerializeField] ItemInventory inventory;
-    [SerializeField] TreasureBoxController treasureBoxController;
+    [SerializeField] TreasureBoxManager treasureBoxController;
     [SerializeField] BattleSystem battleSystem;
     [SerializeField] InventoryUI inventoryUI;
     [SerializeField] FieldSkillController fieldSkill;
     [SerializeField] StatusUI statusUI;
     [SerializeField] ShopController shop;
-    [SerializeField] ShopNPCController shopNPC;
+    [SerializeField] GameObject shopNPCCase;
     [SerializeField] ItemController item;
     [SerializeField] ConfigController config;
     [SerializeField] GameObject menuBar;
     [SerializeField] GameState state;
+    [SerializeField] List<Character> playerFungus = new List<Character>();
+    [SerializeField] Flowchart flowchart;
     public static GameController Instance { get; private set; }
+    bool isOutSide;
+    string[] names = { "PlayerName", "AminaName" };
+    internal GameState State { get => state; set => state = value; }
+    public ShopNPCController[] ShopNPCs { get => shopNPCs; }
+    public bool IsOutSide { get => isOutSide; set => isOutSide = value; }
+    public List<Character> PlayerFungus { get => playerFungus; }
+    public string[] Names { get => names; set => names = value; }
+
+    ShopNPCController[] shopNPCs;
+    readonly List<Battler> battlers = new List<Battler>();
 
     private void Awake()
     {
@@ -48,27 +62,65 @@ public class GameController : MonoBehaviour
 
     private void Start()
     {
+        shopNPCs = shopNPCCase.transform.GetComponentsInChildren<ShopNPCController>();
         player.OnEncounts += StartBattle;
+
         battleSystem.OnBattleOver += EndBattle;
         battleSystem.OnDropItem += TryAdd;
+
         item.OnMenuSelect += StartSelect;
         item.MenuSelectEnd += EndSelect;
         item.OnInventorySelect += ItemSelect;
+
         inventoryUI.OnEquip += Equip;
         inventoryUI.OnUsedItem += UsedItem;
         inventoryUI.OnSelectStart += ItemSelect;
+
         fieldSkill.OnSkill += FieldSkill;
-        shopNPC.OnShopStart += StartShop;
+
+        config.OnConfigClose+= ConfigEnd;
+
         shop.OnBuyItem += ShopAddStart;
         shop.OnSellItem += ShopSellStart;
+
         DialogManager.Instance.OnShowDialog += ShowDialog;
         DialogManager.Instance.OnCloseDialog += CloseDialog;
 
+        player.Battlers[0].Base.SetNeme($"{flowchart.GetVariable($"{Names[0]}")}");
+
+        if (player.Battlers.Count != 1)
+        {
+            player.Battlers[1].Base.SetNeme($"{flowchart.GetVariable($"{Names[1]}")}");
+        }
+
+        for (int i = 0; i < shopNPCs.Length; i++)
+        {
+            shopNPCs[i].OnShopStart += StartShop;
+
+        }
         for (int i = 0; i < treasureBoxController.BoxBase.Count; i++)
         {
             treasureBoxController.BoxBase[i].OnTreasureBoxItem += TreasureAddItem;
 
         }
+    }
+
+    public void StartEvent()
+    {
+        state = GameState.Event;
+    }
+
+    public void EndEvent()
+    {
+        state = GameState.FreeRoam;
+        player.gameObject.SetActive(true);
+        player.StartPlayer();
+    }
+
+    void Showstatus()
+    {
+        state = GameState.OpenStatusUI;
+        statusUI.Open();
     }
 
     void ItemSelect()
@@ -90,10 +142,18 @@ public class GameController : MonoBehaviour
         config.ConfigOpen();
     }
 
+    void ConfigEnd()
+    {
+        state = GameState.OpenMenu;
+        item.State = MenuState.SelectStart;
+        config.ConfigClose();
+
+    }
+
     void FieldSkill()
     {
         state = GameState.OpenFieldSkill;
-        fieldSkill.UseSkillCharaSelectOpen();
+        fieldSkill.SkillSelectOpen();
     }
 
 
@@ -130,6 +190,9 @@ public class GameController : MonoBehaviour
             case GameState.Battle:
                 battleSystem.HandleUpdate();
                 break;
+            case GameState.OpenStatusUI:
+                HandleUpdateStatus();
+                break;
             case GameState.OpenInventory:
                 HandleUpdateInventory();
                 break;
@@ -155,10 +218,18 @@ public class GameController : MonoBehaviour
     void HandleUpdateFreeRoam()
     {
         player.HandleUpdate();
-        if (Input.GetKeyDown(KeyCode.X))
+        if (Input.GetKeyDown(KeyCode.X) && !player.IsSelect)
         {
             StartSelect();
         }
+        else if (Input.GetKeyDown(KeyCode.Z) && !player.IsSelect)
+        {
+            player.Interact();
+            player.WarpFlag();
+            player.HiddenItem();
+        }
+
+
     }
 
     void HandleUpdateOpenMenu()
@@ -175,6 +246,7 @@ public class GameController : MonoBehaviour
 
                         item.StatusUI.Open();
                         item.State = MenuState.Status;
+                        Showstatus();
                     }
                     else if (item.MenuSelectionUI.SelectedIndex == 1)
                     {
@@ -207,11 +279,87 @@ public class GameController : MonoBehaviour
             switch (item.State)
             {
                 case MenuState.Status:
-                    statusUI.Close();
+                    statusUI.StatusClose();
                     item.Open();
                     break;
             }
         }
+    }
+
+    void HandleConfig()
+    {
+        config.HandleUpdate();
+    }
+
+    void HandleUpdateStatus()
+    {
+        if (statusUI.StatusState == StatusState.SelectChara)
+        {
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (statusUI.selectedChara == 0)
+                {
+                    statusUI.selectedChara++;
+                }
+                else
+                {
+                    statusUI.selectedChara--;
+                }
+            }
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                if (statusUI.selectedChara == 1)
+                {
+                    statusUI.selectedChara--;
+                }
+                else
+                {
+                    statusUI.selectedChara++;
+                }
+            }
+
+            statusUI.selectedChara = Mathf.Clamp(statusUI.selectedChara, 0, 1);
+
+            for (int i = 0; i < statusUI.StatusCharas.Length; i++)
+            {
+                bool selected = statusUI.selectedChara == i;
+                statusUI.StatusCharas[i].SetSelectedColor(selected);
+            }
+        }
+
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            if (statusUI.StatusState == StatusState.SelectChara)
+            {
+                if (statusUI.selectedChara < player.Battlers.Count)
+                {
+                    statusUI.StatusOpen();
+                }
+            }
+            else if (statusUI.StatusState == StatusState.ShowStatus)
+            {
+                statusUI.TextClose();
+            }
+        }
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            if (statusUI.StatusState == StatusState.SelectChara)
+            {
+                state = GameState.OpenMenu;
+                statusUI.Close();
+                item.Open();
+            }
+            else if (statusUI.StatusState == StatusState.ShowStatus)
+            {
+                statusUI.StatusClose();
+            }
+            else if (statusUI.StatusState == StatusState.ShowCharaImage)
+            {
+                statusUI.TextOpen();
+            }
+        }
+
     }
 
     void HandleUpdateInventory()
@@ -239,6 +387,12 @@ public class GameController : MonoBehaviour
                 if (inventory.ItemCharas[inventoryUI.SelectedChara].ItemTypes[inventoryUI.SelectedItemType].Items[inventoryUI.SelectedItem].item.Base.GetKanjiName() == "未所持")
                 {
                     UsedItem();
+                }
+                else if (inventory.ItemCharas[inventoryUI.SelectedChara].ItemTypes[inventoryUI.SelectedItemType].Items[inventoryUI.SelectedItem].item.Base.GetItemType() == MoveType.Valuables)
+                {
+                    state = GameState.Busy;
+                    StartCoroutine(inventoryUI.Use());
+
                 }
                 else
                 {
@@ -298,12 +452,32 @@ public class GameController : MonoBehaviour
             }
             else if (fieldSkill.State == SkillStatus.SkillSelect && fieldSkill.CanSelectedSkill())
             {
-                if (player.Battlers[fieldSkill.SelectedChara].Moves[fieldSkill.SelectedSkill].Base.Target == MoveTarget.Foe)
+                if (player.Battlers[fieldSkill.SelectedChara].FieldMoves[fieldSkill.SelectedSkill].Base.Category2 == MoveCategory2.Warp)
+                {
+                    fieldSkill.WarpPointSelectOpen();
+                }
+                else if (player.Battlers[fieldSkill.SelectedChara].FieldMoves[fieldSkill.SelectedSkill].Base.Target == MoveTarget.Foe)
                 {
                     state = GameState.Busy;
                     StartCoroutine(fieldSkill.Skill());
                 }
-                fieldSkill.UseSkillCharaSelectOpen();
+                else
+                {
+                    fieldSkill.UseSkillCharaSelectOpen();
+                }
+            }
+            else if (fieldSkill.State == SkillStatus.WarpPointSelect && fieldSkill.CanSelectedSkill())
+            {
+                state = GameState.Busy;
+                fieldSkill.WarpPointPanel.SetActive(false);
+                if (fieldSkill.Warps[fieldSkill.SelectedWarpPoint] == null)
+                {
+                    state = GameState.OpenFieldSkill;
+                }
+                else
+                {
+                    StartCoroutine(fieldSkill.Skill());
+                }
             }
             else if (fieldSkill.State == SkillStatus.SkillUseCharaSelect)
             {
@@ -317,12 +491,18 @@ public class GameController : MonoBehaviour
             {
                 state = GameState.OpenMenu;
                 fieldSkill.SkillCharaSelectClose();
+                item.Open();
             }
             else if (fieldSkill.State == SkillStatus.SkillSelect)
             {
                 fieldSkill.SkillSelectClose();
                 item.Open();
                 fieldSkill.SkillCharaSelectOpen();
+            }
+            else if (fieldSkill.State == SkillStatus.WarpPointSelect)
+            {
+                fieldSkill.WarpPointSelectClose();
+                fieldSkill.SkillSelectOpen();
             }
             else if (fieldSkill.State == SkillStatus.SkillUseCharaSelect)
             {
@@ -332,23 +512,6 @@ public class GameController : MonoBehaviour
         }
     }
 
-    void HandleConfig()
-    {
-        config.HandleUpdate();
-        if (Input.GetKeyDown(KeyCode.X))
-        {
-            switch (config.ConfigState)
-            {
-                case ConfigState.Select:
-                    state = GameState.OpenMenu;
-                    item.State = MenuState.SelectStart;
-                    config.ConfigClose();
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
     void HandleUpdateShop()
     {
         shop.HandleUpdate();
@@ -464,14 +627,17 @@ public class GameController : MonoBehaviour
     }
 
 
-    public void StartBattle(Battler enemy)
+    public void StartBattle(List<Battler> enemes)
     {
         state = GameState.Battle;
-        enemy.Init();
+        for (int i = 0; i < enemes.Count; i++)
+        {
+            enemes[i].Init();
+        }
         menuBar.gameObject.SetActive(false);
         player.gameObject.SetActive(false);
         battleSystem.gameObject.SetActive(true);
-        battleSystem.BattleStart(player, enemy);
+        battleSystem.BattleStart(player, enemes);
     }
 
 
@@ -480,6 +646,7 @@ public class GameController : MonoBehaviour
         battleSystem.gameObject.SetActive(false);
         menuBar.gameObject.SetActive(true);
         player.gameObject.SetActive(true);
+        player.EnemyBattlers.Clear();
         if (win)
         {
             player.StartPlayer();
@@ -493,6 +660,7 @@ public class GameController : MonoBehaviour
             state = GameState.FreeRoam;
             DialogManager.Instance.Close();
         }
+        battlers.Clear();
     }
 
     public void BossBattle(Battler wildBattler)
@@ -500,7 +668,8 @@ public class GameController : MonoBehaviour
         state = GameState.Battle;
         menuBar.gameObject.SetActive(false);
         player.gameObject.SetActive(false);
-        battleSystem.BattleStart(player, wildBattler, true);
+        battlers.Add(wildBattler);
+        battleSystem.BattleStart(player, battlers, true);
     }
 
 
@@ -527,11 +696,11 @@ public class GameController : MonoBehaviour
         fieldSkill.SkillCharaSelectOpen();
     }
 
-    public void StartShop()
+    public void StartShop(List<Item> items, int index)
     {
         state = GameState.Shop;
         menuBar.SetActive(false);
-        shop.SelectActionOpen();
+        shop.SelectActionOpen(items, index);
     }
     public void EndShop()
     {
@@ -556,7 +725,7 @@ public class GameController : MonoBehaviour
     {
         for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
         {
-            if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+            if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
             {
                 if (inventory.ItemCharas[0].ItemTypes[1].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                 {
@@ -566,7 +735,7 @@ public class GameController : MonoBehaviour
 
             }
 
-            if (item.Base.GetItemType() == Type.Valuables)
+            if (item.Base.GetItemType() == MoveType.Valuables)
             {
                 if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                 {
@@ -586,7 +755,7 @@ public class GameController : MonoBehaviour
         }
         for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
         {
-            if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+            if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
             {
                 if (inventory.ItemCharas[0].ItemTypes[1].Items[i].item.Base.GetKanjiName() == "未所持")
                 {
@@ -595,7 +764,7 @@ public class GameController : MonoBehaviour
                     return;
                 }
             }
-            else if (item.Base.GetItemType() == Type.Valuables)
+            else if (item.Base.GetItemType() == MoveType.Valuables)
             {
                 if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
                 {
@@ -617,7 +786,7 @@ public class GameController : MonoBehaviour
         }
         for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
         {
-            if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+            if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
             {
                 if (inventory.ItemCharas[1].ItemTypes[1].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                 {
@@ -627,7 +796,7 @@ public class GameController : MonoBehaviour
 
             }
 
-            if (item.Base.GetItemType() == Type.Valuables)
+            if (item.Base.GetItemType() == MoveType.Valuables)
             {
                 if (inventory.ItemCharas[1].ItemTypes[2].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                 {
@@ -647,7 +816,7 @@ public class GameController : MonoBehaviour
         }
         for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
         {
-            if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+            if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
             {
                 if (inventory.ItemCharas[1].ItemTypes[1].Items[i].item.Base.GetKanjiName() == "未所持")
                 {
@@ -656,7 +825,7 @@ public class GameController : MonoBehaviour
                     return;
                 }
             }
-            else if (item.Base.GetItemType() == Type.Valuables)
+            else if (item.Base.GetItemType() == MoveType.Valuables)
             {
                 if (inventory.ItemCharas[1].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
                 {
@@ -681,7 +850,7 @@ public class GameController : MonoBehaviour
     {
         for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
         {
-            if (item.Base.GetItemType() == Type.Weapon | item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+            if (item.Base.GetItemType() == MoveType.Weapon | item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
             {
                 if (inventory.ItemCharas[0].ItemTypes[1].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                 {
@@ -690,7 +859,7 @@ public class GameController : MonoBehaviour
                 }
 
             }
-            if (item.Base.GetItemType() == Type.Valuables)
+            if (item.Base.GetItemType() == MoveType.Valuables)
             {
                 if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                 {
@@ -710,7 +879,7 @@ public class GameController : MonoBehaviour
         }
         for (int i = 0; i < inventory.ItemCharas[0].ItemTypes[0].Items.Count; i++)
         {
-            if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+            if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
             {
                 if (inventory.ItemCharas[0].ItemTypes[1].Items[i].item.Base.GetKanjiName() == "未所持")
                 {
@@ -719,7 +888,7 @@ public class GameController : MonoBehaviour
                     return;
                 }
             }
-            else if (item.Base.GetItemType() == Type.Valuables)
+            else if (item.Base.GetItemType() == MoveType.Valuables)
             {
                 if (inventory.ItemCharas[0].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
                 {
@@ -742,9 +911,11 @@ public class GameController : MonoBehaviour
     }
     public IEnumerator ShopAddItem(Item item, int sumItem)
     {
+        state = GameState.Busy;
         if (sumItem <= 0)
         {
             shop.BuyInit();
+            state = GameState.Shop;
             yield break;
         }
         if (player.Battlers[0].Gold >= item.Base.GetGold() && player.Battlers[0].Gold >= item.Base.GetGold() * sumItem)
@@ -752,7 +923,7 @@ public class GameController : MonoBehaviour
             player.Battlers[0].Gold -= item.Base.GetGold() * sumItem;
             for (int i = 0; i < inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items.Count; i++)
             {
-                if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+                if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
                 {
                     if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                     {
@@ -761,10 +932,11 @@ public class GameController : MonoBehaviour
                         shop.BuyClose();
                         yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
+                        state = GameState.Shop;
                         yield break;
                     }
                 }
-                else if (item.Base.GetItemType() == Type.Valuables)
+                else if (item.Base.GetItemType() == MoveType.Valuables)
                 {
                     if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].item.Base.GetHiraganaName() == item.Base.GetHiraganaName())
                     {
@@ -773,6 +945,7 @@ public class GameController : MonoBehaviour
                         shop.BuyClose();
                         yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
+                        state = GameState.Shop;
                         yield break;
                     }
                 }
@@ -785,13 +958,14 @@ public class GameController : MonoBehaviour
                         shop.BuyClose();
                         yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
+                        state = GameState.Shop;
                         yield break;
                     }
                 }
             }
             for (int i = 0; i < inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[0].Items.Count; i++)
             {
-                if (item.Base.GetItemType() == Type.Weapon || item.Base.GetItemType() == Type.Armor || item.Base.GetItemType() == Type.Accessory)
+                if (item.Base.GetItemType() == MoveType.Weapon || item.Base.GetItemType() == MoveType.Armor || item.Base.GetItemType() == MoveType.Accessory)
                 {
                     if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[1].Items[i].item.Base.GetKanjiName() == "未所持")
                     {
@@ -801,10 +975,11 @@ public class GameController : MonoBehaviour
                         shop.BuyClose();
                         yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
+                        state = GameState.Shop;
                         yield break;
                     }
                 }
-                else if (item.Base.GetItemType() == Type.Valuables)
+                else if (item.Base.GetItemType() == MoveType.Valuables)
                 {
                     if (inventory.ItemCharas[shop.SelectedBuyChara].ItemTypes[2].Items[i].item.Base.GetKanjiName() == "未所持")
                     {
@@ -814,6 +989,7 @@ public class GameController : MonoBehaviour
                         shop.BuyClose();
                         yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
+                        state = GameState.Shop;
                         yield break;
                     }
                 }
@@ -827,6 +1003,7 @@ public class GameController : MonoBehaviour
                         shop.BuyClose();
                         yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か要るもんはあるかい？"));
                         shop.BuySelectOpen();
+                        state = GameState.Shop;
                         yield break;
                     }
                 }
@@ -837,15 +1014,18 @@ public class GameController : MonoBehaviour
             shop.BuyClose();
             yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"うん？ゴールドが足りないようだよ"));
             shop.BuySelectOpen();
+            state = GameState.Shop;
             yield break;
         }
     }
 
     public IEnumerator ShopSellItem(Item item, int sumItem)
     {
+        state = GameState.Busy;
         if (sumItem <= 0)
         {
             shop.SellInit();
+            state = GameState.Shop;
             yield break; ;
         }
         for (int i = 0; i < inventory.ItemCharas[shop.SelectedChara].ItemTypes[shop.SelectedItemType].Items.Count; i++)
@@ -865,6 +1045,7 @@ public class GameController : MonoBehaviour
                     shop.SellClose();
                     shop.SellSelectOpen();
                     yield return StartCoroutine(DialogManager.Instance.FieldTypeDialog($"{item.Base.GetKanjiName()}を{sumItem}個だね\n他に何か売るもんはあるかい？"));
+                    state = GameState.Shop;
                     yield break;
                 }
             }
@@ -872,7 +1053,7 @@ public class GameController : MonoBehaviour
     }
     public void Equip(Item item)
     {
-        if (item.Base.GetItemType() == Type.Weapon)
+        if (item.Base.GetItemType() == MoveType.Weapon)
         {
             Item tmp;
             if (player.Battlers[inventoryUI.SelectedItemUseChara].Base.GetEquipWeapon().Base.GetKanjiName() != "未所持")
@@ -941,7 +1122,7 @@ public class GameController : MonoBehaviour
                 return;
             }
         }
-        else if (item.Base.GetItemType() == Type.Armor)
+        else if (item.Base.GetItemType() == MoveType.Armor)
         {
             Item tmp;
             if (player.Battlers[inventoryUI.SelectedItemUseChara].Base.GetEquipArmor().Base.GetKanjiName() != "未所持")
@@ -1010,7 +1191,7 @@ public class GameController : MonoBehaviour
                 return;
             }
         }
-        else if (item.Base.GetItemType() == Type.Accessory)
+        else if (item.Base.GetItemType() == MoveType.Accessory)
         {
             Item tmp;
             if (player.Battlers[inventoryUI.SelectedItemUseChara].Base.GetEquipAccessory().Base.GetKanjiName() != "未所持")

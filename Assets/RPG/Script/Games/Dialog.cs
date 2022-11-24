@@ -7,7 +7,7 @@ public class Dialog
 {
     [SerializeField] List<Line> lines = new List<Line>();
 
-    internal List<Line> Lines { get => lines; set => lines = value; }
+    internal List<Line> Lines { get => lines;}
 }
 
 [System.Serializable]
@@ -15,8 +15,15 @@ class Line
 {
     [TextArea]
     [SerializeField] string log;
-    [SerializeField] BattlerBase battlerBase;
+    [SerializeField] NPCBase nPC;
+    [SerializeField] int faceIndex;
 
-    public string Log { get => log; set => log = value; }
-    public BattlerBase BattlerBase { get => battlerBase; set => battlerBase = value; }
+    public string Log { get => log;}
+    public int FaceIndex { get => faceIndex; }
+    public NPCBase NPC { get => nPC;}
+
+    public void SetLog(string str)
+    {
+        log = str;
+    }
 }

@@ -11,9 +11,11 @@ public class Battler
     //データの初期化がされてない＆_baseとlevelが使われていない
     //インスペクターからデータを設定できるようにする
     [SerializeField] BattlerBase _base;
+    [SerializeField] int battlerIndex;
     [SerializeField] int level;
     //ベースとなるデータ
     public BattlerBase Base { get => _base; }
+    public string Name { get; set; }
     public int Level { get => level; }
     public int HasExp { get; set; }
     public int Gold { get; set; }
@@ -24,9 +26,10 @@ public class Battler
 
     //覚える技
     public List<Move> Moves { get; set; }
+    public List<Move> FieldMoves { get; set; }
     //現在の技
     public Move CurrentMove { get; set; }
-    
+
     //初期ステータスと追加ステータス
     public Dictionary<Stat, int> Stats { get; set; }
     public Dictionary<Stat, int> StatBoosts { get; set; }
@@ -48,6 +51,9 @@ public class Battler
     public Condition VolatileStatus { get; private set; }
     public int VolatileStatusTime { get; set; }
 
+    //もう死んでるかどうか
+    public bool isDai;
+
 
 
     readonly Dictionary<Stat, string> statDic = new Dictionary<Stat, string>()
@@ -56,6 +62,7 @@ public class Battler
         {Stat.Defense, "防御力"},
         {Stat.Intelligence ,"知力"},
         {Stat.Mind ,"精神力"},
+        {Stat.Speed ,"素早さ"},
 
     };
 
@@ -64,21 +71,31 @@ public class Battler
     //初期化
     public void Init()
     {
-        StatusChanges = new Queue<string>();
+       StatusChanges = new Queue<string>();
         //覚える技から使える技を生成
         Moves = new List<Move>();
+        FieldMoves = new List<Move>();
         foreach (var learnableMove in Base.LearnableMoves)
         {
             if (learnableMove.Level <= level)
             {
-                Moves.Add(new Move(learnableMove.MoveBase));
+                if (learnableMove.MoveBase.Category1 == MoveCategory1.FieldSkill)
+                {
+                    FieldMoves.Add(new Move(learnableMove.MoveBase));
+                }
+                else
+                {
+                    Moves.Add(new Move(learnableMove.MoveBase));
+                }
             }
-        }
+      }
 
         ResetStatBoost();
-        CalculateStats();
+       CalculateStats();
+        Name = Base.Name;
         HP = MaxHP;
         MP = MaxMP;
+        isDai = false;
         Status = null;
         VolatileStatus = null;
     }
@@ -90,6 +107,7 @@ public class Battler
             {Stat.Defense ,0},
             {Stat.Intelligence ,0},
             {Stat.Mind ,0},
+            {Stat.Speed ,0},
         };
     }
 
@@ -101,10 +119,11 @@ public class Battler
             { Stat.Attack, Mathf.FloorToInt(Base.At * Level)+5},
             { Stat.Defense, Mathf.FloorToInt(Base.Def * Level) + 5 },
             {Stat.Intelligence, Mathf.FloorToInt(Base.Inte * Level) + 5 },
-            {Stat.Mind, Mathf.FloorToInt(Base.Mid * Level) + 5 }
+            {Stat.Mind, Mathf.FloorToInt(Base.Mid * Level) + 5 },
+            {Stat.Speed, Mathf.FloorToInt(Base.Spd * Level) + 5+Mathf.FloorToInt( Base.Spd + Base.GetEquipArmor().Base.GetSpeedAmount() + Base.GetEquipAccessory().Base.GetSpeedAmount() )},
         };
         MaxHP = Mathf.FloorToInt(Base.MaxHP * Level) + 10 + Level;
-        MaxMP = Mathf.FloorToInt(Base.MaxMP * Level)+ 10 + Level;
+        MaxMP = Mathf.FloorToInt(Base.MaxMP * Level) + 10 + Level;
     }
 
     int GetStat(Stat stat)
@@ -167,9 +186,14 @@ public class Battler
     {
         get { return GetStat(Stat.Mind); }
     }
+    public int Speed
+    {
+        get { return GetStat(Stat.Speed); }
+    }
 
     public int MaxHP { get; private set; }
     public int MaxMP { get; private set; }
+    public int BattlerIndex { get => battlerIndex; }
 
     public DamageDetailes TakeDamage(Move move, Battler attacker, Battler target)
     {
@@ -224,8 +248,7 @@ public class Battler
         {
             if (mod == 0)
             {
-                resultText = $"{attacker.Base.Name}は攻撃を外した！";
-
+                resultText = $"{attacker.Name}は攻撃を外した！";
             }
             else if (mod == 1)
             {
@@ -262,12 +285,12 @@ public class Battler
         };
 
         int damage = 0;
-        int modfil = UnityEngine.Random.Range(0, 2);
-        int mod = UnityEngine.Random.Range(0, 1);
+        int modfil = UnityEngine.Random.Range(0, 3);
+        int mod = UnityEngine.Random.Range(0, 2);
 
         //攻撃力÷2－守備力÷4＝ダメージ基礎値
         //ダメージ基礎値 ÷16＋1（端数切捨）
-        float a = (((attack + (float)attacker.Base.GetEquipWeapon().Base.GetAmount()) / 2) - ((defense + (float)target.Base.GetEquipArmor().Base.GetAmount()) / 4))  * critical;
+        float a = (((attack + (float)attacker.Base.GetEquipWeapon().Base.GetAmount()) / 2) - ((defense + (float)target.Base.GetEquipArmor().Base.GetAmount()) / 4)) * critical;
         float b = a / 16 + 1;
         if (modfil == 0)
         {
@@ -285,7 +308,7 @@ public class Battler
         {
             if (mod == 0)
             {
-                resultText = $"{attacker.Base.Name}は攻撃を外した！";
+                resultText = $"{attacker.Name}は攻撃を外した！";
 
             }
             else if (mod == 1)
@@ -293,13 +316,13 @@ public class Battler
                 damage = 1;
 
                 HP = Mathf.Clamp(HP - damage, 0, MaxHP);
-                resultText = $"{attacker.Base.Name}の通常攻撃\n{target.Base.Name}は{damage}のダメージ";
+                resultText = $"{attacker.Name}の通常攻撃\n{target.Name}は{damage}のダメージ";
             }
         }
         else
         {
             HP = Mathf.Clamp(HP - damage, 0, MaxHP);
-            resultText = $"{attacker.Base.Name}の通常攻撃\n{target.Base.Name}は{damage}のダメージ";
+            resultText = $"{attacker.Base.Name}の通常攻撃\n{target.Name}は{damage}のダメージ";
         }
         return damageDetailes;
     }
@@ -318,7 +341,7 @@ public class Battler
 
     public bool IsLevelUp(BattleUnit playerUnit)
     {
-        if (HasExp >= (400*Level* Level / (204- Level))+5)
+        if (HasExp >= (400 * Level * Level / (204 - Level)) + 5)
         {
             int fMaxHp = MaxHP;
             int fMaxMp = MaxMP;

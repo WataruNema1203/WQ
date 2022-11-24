@@ -1,17 +1,18 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Events;
 using System.Linq;
-using System;
+using TMPro;
 
 
 enum SkillStatus
 {
+    Busy,
     CharaSelect,
     SkillSelect,
     SkillUseCharaSelect,
+    WarpPointSelect,
 }
 
 public class FieldSkillController : MonoBehaviour
@@ -21,26 +22,35 @@ public class FieldSkillController : MonoBehaviour
     [SerializeField] GameObject skillCharaPanel;
     [SerializeField] GameObject skillPanel;
     [SerializeField] GameObject skillUseCharaPanel;
-    [SerializeField] Text informationText;
-    [SerializeField] Text informationValueText;
+    [SerializeField] GameObject warpPointPanel;
+    [SerializeField] WarpPointManager warpPoint;
+    [SerializeField] WarpSkillController warp;
+    [SerializeField] TextMeshProUGUI informationText;
+    [SerializeField] TextMeshProUGUI informationValueText;
 
     SkillUI[] skillSlots;
     SkillCharaUI[] skillCharaSlots;
     SkillUseUI[] skillUseCharaSlots;
+    WarpPointUI[] warpPoints;
     int selectedChara;
     int selectedSkill;
     int selectedSkillUseChara;
+    int selectedWarpPoint;
     SkillStatus state;
 
+    public List<WarpPointBase> Warps { get; set; }
+
     //覚える技
-    public List<Move> Moves { get; set; }
+    public List<Move> FieldMoves { get; set; }
     //現在の技
     public Move CurrentMove { get; set; }
 
     public int SelectedSkill { get => selectedSkill; }
     internal SkillStatus State { get => state; }
     public int SelectedItemUseChara { get => selectedSkillUseChara; }
-    public int SelectedChara { get => selectedChara; set => selectedChara = value; }
+    public int SelectedChara { get => selectedChara; }
+    public int SelectedWarpPoint { get => selectedWarpPoint; }
+    public GameObject WarpPointPanel { get => warpPointPanel; set => warpPointPanel = value; }
 
     public UnityAction OnSkill;
 
@@ -48,24 +58,37 @@ public class FieldSkillController : MonoBehaviour
 
     public void SkillCharaInit()
     {
-        selectedChara = 0;
         skillCharaSlots = GetComponentsInChildren<SkillCharaUI>();
 
         SkillCharaShow();
     }
 
+    public void WarpPointInit()
+    {
+        warpPoints = GetComponentsInChildren<WarpPointUI>();
+        Warps = new List<WarpPointBase>(10);
+        for (int i = 0; i < warpPoint.WarpPoints.Count; i++)
+        {
+            Warps.Add(warpPoint.WarpPoints[i]);
+        }
+
+        WarpPointShow();
+    }
+
     public void SkillInit()
     {
-        selectedSkill = 0;
         skillSlots = GetComponentsInChildren<SkillUI>();
 
         //覚える技から使える技を生成
-        Moves = new List<Move>(10);
+        FieldMoves = new List<Move>(10);
         foreach (var learnableMove in player.Battlers[selectedChara].Base.LearnableMoves)
         {
             if (learnableMove.Level <= player.Battlers[selectedChara].Level)
             {
-                Moves.Add(new Move(learnableMove.MoveBase));
+                if (learnableMove.MoveBase.Category1 == MoveCategory1.FieldSkill)
+                {
+                    FieldMoves.Add(new Move(learnableMove.MoveBase));
+                }
             }
         }
 
@@ -73,7 +96,6 @@ public class FieldSkillController : MonoBehaviour
     }
     public void SkillUseInit()
     {
-        selectedSkillUseChara = 0;
         skillUseCharaSlots = GetComponentsInChildren<SkillUseUI>();
 
         SkillUseCharaShow();
@@ -85,13 +107,13 @@ public class FieldSkillController : MonoBehaviour
         {
             if (i == 0)
             {
-                skillCharaSlots[i].SetText("主人公");
+                skillCharaSlots[i].SetText($"{player.Battlers[i].Base.Name}");
             }
             else if (i == 1)
             {
                 if (player.Battlers.Count == 2)
                 {
-                    skillCharaSlots[i].SetText("アミナ");
+                    skillCharaSlots[i].SetText($"{player.Battlers[i].Base.Name}");
                 }
                 else
                 {
@@ -105,31 +127,56 @@ public class FieldSkillController : MonoBehaviour
     {
         for (int i = 0; i < skillSlots.Length; i++)
         {
-            if (Moves.Count <= 10)
+            if (FieldMoves.Count <= 10)
             {
-                Moves.Add(null);
+                FieldMoves.Add(null);
             }
         }
         for (int i = 0; i < skillSlots.Length; i++)
         {
 
-            if (Moves[i] == null)
+            if (FieldMoves[i] == null)
             {
                 skillSlots[i].SetText($"-");
-                skillSlots[i].transform.Find("SkillMPText").GetComponent<Text>().text = " ";
+                skillSlots[i].transform.Find("SkillMPText").GetComponent<TextMeshProUGUI>().text = " ";
 
             }
-            else if (Moves[i].Base.Category1 == MoveCategory1.Skill || Moves[i].Base.Category1 == MoveCategory1.Stat || Moves[i].Base.Category1 == MoveCategory1.Physical)
+            else if (FieldMoves[i].Base.Category1 != MoveCategory1.FieldSkill)
             {
-                skillSlots[i].SetText($"{Moves[i].Base.Name}");
-                skillSlots[i].transform.Find("SkillMPText").GetComponent<Text>().text = "";
+                skillSlots[i].SetText($"{FieldMoves[i].Base.Name}");
+                skillSlots[i].transform.Find("SkillMPText").GetComponent<TextMeshProUGUI>().text = "";
 
             }
-            else if (Moves[i].Base == true)
+            else if (FieldMoves[i].Base == true)
             {
-                skillSlots[i].SetText($"{Moves[i].Base.Name}");
-                skillSlots[i].transform.Find("SkillMPText").GetComponent<Text>().text = "MP  " + $"{Moves[i].Base.Mp}";
+                skillSlots[i].SetText($"{FieldMoves[i].Base.Name}");
+                skillSlots[i].transform.Find("SkillMPText").GetComponent<TextMeshProUGUI>().text = "MP  " + $"{FieldMoves[i].Base.Mp}";
 
+            }
+        }
+    }
+    void WarpPointShow()
+    {
+        for (int i = 0; i < warpPoints.Length; i++)
+        {
+            if (Warps.Count <= 10)
+            {
+                Warps.Add(null);
+            }
+        }
+        for (int i = 0; i < warpPoints.Length; i++)
+        {
+            if (Warps[i] == null)
+            {
+                warpPoints[i].SetText($"-");
+            }
+            else if (Warps[i])
+            {
+                warpPoints[i].SetText($"{Warps[i].PointName}");
+            }
+            else if (Warps[i].WarpPoint == true)
+            {
+                warpPoints[i].SetText($"{Warps[i].PointName}");
             }
         }
     }
@@ -139,13 +186,13 @@ public class FieldSkillController : MonoBehaviour
         {
             if (i == 0)
             {
-                skillUseCharaSlots[i].SetText($"主人公 HP{player.Battlers[0].HP}/{player.Battlers[0].MaxHP} MP{player.Battlers[0].MP}/{player.Battlers[0].MaxMP}");
+                skillUseCharaSlots[i].SetText($"{player.Battlers[i].Base.Name} HP{player.Battlers[0].HP}/{player.Battlers[0].MaxHP} MP{player.Battlers[0].MP}/{player.Battlers[0].MaxMP}");
             }
             else if (i == 1)
             {
                 if (player.Battlers.Count == 2)
                 {
-                    skillUseCharaSlots[i].SetText($"アミナ HP{player.Battlers[1].HP}/{player.Battlers[1].MaxHP} MP{player.Battlers[1].MP}/{player.Battlers[1].MaxMP}");
+                    skillUseCharaSlots[i].SetText($"{ player.Battlers[i].Base.Name} HP{player.Battlers[1].HP}/{player.Battlers[1].MaxHP} MP{player.Battlers[1].MP}/{player.Battlers[1].MaxMP}");
                 }
                 else
                 {
@@ -251,21 +298,21 @@ public class FieldSkillController : MonoBehaviour
                         if (CanSelectedSkill())
                         {
                             descriptionPanel.SetActive(true);
-                            if (Moves[i].Base.Category1 == MoveCategory1.Skill || Moves[i].Base.Category1 == MoveCategory1.Stat || Moves[i].Base.Category1 == MoveCategory1.Physical)
+                            if (FieldMoves[i].Base.Category1 == MoveCategory1.Skill || FieldMoves[i].Base.Category1 == MoveCategory1.Stat || FieldMoves[i].Base.Category1 == MoveCategory1.Physical)
                             {
                                 informationText.text = "戦闘中専用スキル";
                                 informationValueText.text = "使用不可";
                             }
-                            else if (Moves[i].Base.Category1 == MoveCategory1.FullHeal)
+                            else if (FieldMoves[i].Base.Category1 == MoveCategory1.FullHeal)
                             {
-                                informationText.text = $"{Moves[SelectedSkill].Base.Information}";
+                                informationText.text = $"{FieldMoves[SelectedSkill].Base.Information}";
                                 informationValueText.text = $"HP全回復";
 
                             }
                             else
                             {
-                                informationText.text = $"{Moves[SelectedSkill].Base.Information}";
-                                informationValueText.text = $"{Moves[selectedSkill].Base.Power}";
+                                informationText.text = $"{FieldMoves[SelectedSkill].Base.Information}";
+                                informationValueText.text = $"{FieldMoves[selectedSkill].Base.Power}";
                             }
                         }
                         else
@@ -274,6 +321,64 @@ public class FieldSkillController : MonoBehaviour
                         }
                     }
                     skillSlots[i].SetSelectedColor(selected);
+                }
+                break;
+            case SkillStatus.WarpPointSelect:
+                if (Input.GetKeyDown(KeyCode.UpArrow))
+                {
+                    if (selectedWarpPoint == 0 || selectedWarpPoint == 1)
+                    {
+                        selectedWarpPoint += 8;
+                    }
+                    else
+                    {
+                        selectedWarpPoint -= 2;
+
+                    }
+                }
+                else if (Input.GetKeyDown(KeyCode.DownArrow))
+                {
+                    if (selectedWarpPoint == 8 || selectedWarpPoint == 9)
+                    {
+                        selectedWarpPoint -= 8;
+                    }
+                    else
+                    {
+                        selectedWarpPoint += 2;
+
+                    }
+                }
+                else if (Input.GetKeyDown(KeyCode.LeftArrow))
+                {
+                    if (selectedWarpPoint == 0)
+                    {
+                        selectedWarpPoint += 9;
+                    }
+                    else
+                    {
+                        selectedWarpPoint--;
+
+                    }
+                }
+                else if (Input.GetKeyDown(KeyCode.RightArrow))
+                {
+                    if (selectedWarpPoint == 9)
+                    {
+                        selectedWarpPoint -= 9;
+                    }
+                    else
+                    {
+                        selectedWarpPoint++;
+
+                    }
+                }
+
+                selectedWarpPoint = Mathf.Clamp(selectedWarpPoint, 0, warpPoints.Length - 1);
+
+                for (int i = 0; i < warpPoints.Length; i++)
+                {
+                    bool selected = selectedWarpPoint == i;
+                    warpPoints[i].SetSelectedColor(selected);
                 }
                 break;
             case SkillStatus.SkillUseCharaSelect:
@@ -314,7 +419,7 @@ public class FieldSkillController : MonoBehaviour
 
     public bool CanSelectedSkill()
     {
-        if (Moves[selectedSkill] == null)
+        if (FieldMoves[selectedSkill] == null)
         {
             return false;
         }
@@ -325,22 +430,33 @@ public class FieldSkillController : MonoBehaviour
 
     public IEnumerator Skill()
     {
-        if (player.Battlers[selectedChara].Moves[selectedSkill] == null || player.Battlers[selectedChara].Moves[selectedSkill].Base.Category1 == MoveCategory1.Skill ||
-            player.Battlers[selectedChara].Moves[selectedSkill].Base.Category1 == MoveCategory1.Physical || player.Battlers[selectedChara].Moves[selectedSkill].Base.Category1 == MoveCategory1.Stat)
+        state = SkillStatus.Busy;
+        Move fieldMoves = player.Battlers[selectedChara].FieldMoves[selectedSkill];
+
+        if (fieldMoves.Base.Category1 != MoveCategory1.FieldSkill)
         {
             yield return StartCoroutine(DialogManager.Instance.TypeDialog("戦闘外で使うスキルじゃないようだ"));
+            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+            DialogManager.Instance.Close();
+            OnSkill?.Invoke();
+        }
+        else if (fieldMoves.Base.Category2 == MoveCategory2.Warp&&GameController.Instance.IsOutSide==false)
+        {
+            yield return StartCoroutine(DialogManager.Instance.TypeDialog("ここではワープができない！"));
+            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+            DialogManager.Instance.Close();
             OnSkill?.Invoke();
         }
         else
         {
-            Move move = player.Battlers[selectedChara].Moves[selectedSkill];
-            if (move.Base.Mp > player.Battlers[selectedChara].MP)
+            if (fieldMoves.Base.Mp > player.Battlers[selectedChara].MP)
             {
                 yield return StartCoroutine(DialogManager.Instance.TypeDialog($"MPがたりない！"));
                 yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                DialogManager.Instance.Close();
                 OnSkill?.Invoke();
             }
-            else if (move.Base.Category1 == MoveCategory1.Heal)
+            else if (fieldMoves.Base.Category1 == MoveCategory1.Heal)
             {
                 int healPoint = 0;
                 if (player.Battlers[selectedSkillUseChara].HP == player.Battlers[selectedSkillUseChara].MaxHP)
@@ -352,22 +468,13 @@ public class FieldSkillController : MonoBehaviour
                     OnSkill?.Invoke();
                     yield break;
                 }
-                else if (player.Battlers[selectedSkillUseChara].HP > 0)
-                {
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectedSkillUseChara].Base.Name}のはまだ死んでいない"));
-                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                    DialogManager.Instance.Close();
-                    descriptionPanel.SetActive(false);
-                    OnSkill?.Invoke();
-                    yield break;
-                }
                 else
                 {
-                    player.Battlers[selectedChara].MP -= player.Battlers[selectedChara].Moves[selectedSkill].Base.Mp;
+                    player.Battlers[selectedChara].MP -= fieldMoves.Base.Mp;
                     SkillShow();
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{move.Base.Name}を使った"));
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{fieldMoves.Base.Name}を使った"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                    healPoint += Mathf.Clamp(healPoint + move.Base.Power, 0, player.Battlers[selectedSkillUseChara].MaxHP);
+                    healPoint += Mathf.Clamp(healPoint + fieldMoves.Base.Power, 0, player.Battlers[selectedSkillUseChara].MaxHP);
                     player.Battlers[selectedSkillUseChara].HP += healPoint;
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"HPが{healPoint}回復した"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -377,7 +484,7 @@ public class FieldSkillController : MonoBehaviour
                     OnSkill?.Invoke();
                 }
             }
-            else if (move.Base.Category1 == MoveCategory1.FullHeal)
+            else if (fieldMoves.Base.Category1 == MoveCategory1.FullHeal)
             {
                 if (player.Battlers[selectedSkillUseChara].HP == player.Battlers[selectedSkillUseChara].MaxHP)
                 {
@@ -399,9 +506,9 @@ public class FieldSkillController : MonoBehaviour
                 }
                 else
                 {
-                    player.Battlers[selectedChara].MP -= player.Battlers[selectedChara].Moves[selectedSkill].Base.Mp;
+                    player.Battlers[selectedChara].MP -= fieldMoves.Base.Mp;
                     SkillShow();
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{move.Base.Name}を使った"));
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{fieldMoves.Base.Name}を使った"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                     player.Battlers[selectedSkillUseChara].HP = player.Battlers[selectedSkillUseChara].MaxHP;
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"HPが全回復した"));
@@ -412,9 +519,9 @@ public class FieldSkillController : MonoBehaviour
                     OnSkill?.Invoke();
                 }
             }
-            else if (move.Base.Category1 == MoveCategory1.Resuscitation)
+            else if (fieldMoves.Base.Category1 == MoveCategory1.Resuscitation)
             {
-                if (player.Battlers[selectedSkillUseChara].HP > 0)
+                if (!player.Battlers[selectedSkillUseChara].isDai)
                 {
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectedSkillUseChara].Base.Name}はまだ死んでいない"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -423,11 +530,11 @@ public class FieldSkillController : MonoBehaviour
                     OnSkill?.Invoke();
                     yield break;
                 }
-                else if (player.Battlers[selectedSkillUseChara].HP <= 0)
+                else if (player.Battlers[selectedSkillUseChara].isDai)
                 {
-                    player.Battlers[selectedChara].MP -= player.Battlers[selectedChara].Moves[selectedSkill].Base.Mp;
+                    player.Battlers[selectedChara].MP -= fieldMoves.Base.Mp;
                     SkillShow();
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{move.Base.Name}を使った"));
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{fieldMoves.Base.Name}を使った"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                     player.Battlers[selectedSkillUseChara].HP = player.Battlers[selectedSkillUseChara].MaxHP;
                     yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{player.Battlers[selectedSkillUseChara].Base.Name}が生き返った"));
@@ -438,11 +545,11 @@ public class FieldSkillController : MonoBehaviour
                     OnSkill?.Invoke();
                 }
             }
-            else if (move.Base.Category1 == MoveCategory1.Field)
+            else if (fieldMoves.Base.Category2 == MoveCategory2.EncountSkill)
             {
                 if (player.EncountMod > 5 || player.EncountMod < 5)
                 {
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{move.Base.Name}は使わなくてもいいようだ"));
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{fieldMoves.Base.Name}は使わなくてもいいようだ"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                     DialogManager.Instance.Close();
                     descriptionPanel.SetActive(false);
@@ -451,12 +558,12 @@ public class FieldSkillController : MonoBehaviour
                 }
                 else
                 {
-                    player.Battlers[selectedChara].MP -= player.Battlers[selectedChara].Moves[selectedSkill].Base.Mp;
+                    player.Battlers[selectedChara].MP -= fieldMoves.Base.Mp;
                     SkillShow();
-                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{move.Base.Name}を使った"));
+                    yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{fieldMoves.Base.Name}を使った"));
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                    player.EncountMod = move.Base.Power;
-                    player.EncountSkill = move.Base.SkillPower;
+                    player.EncountMod = fieldMoves.Base.Power;
+                    player.EncountSkill = fieldMoves.Base.SkillPower;
                     if (player.EncountMod == 5)
                     {
                         if (player.EncountMod > 5)
@@ -471,7 +578,6 @@ public class FieldSkillController : MonoBehaviour
                         }
                         descriptionPanel.SetActive(false);
                         DialogManager.Instance.Close();
-                        SkillUseCharaShow();
                         OnSkill?.Invoke();
                         yield break;
                     }
@@ -489,14 +595,32 @@ public class FieldSkillController : MonoBehaviour
                         }
                         descriptionPanel.SetActive(false);
                         DialogManager.Instance.Close();
-                        SkillUseCharaShow();
                         OnSkill?.Invoke();
                         yield break;
                     }
                 }
             }
+            else if (fieldMoves.Base.Category2 == MoveCategory2.Warp)
+            {
+                player.Battlers[selectedChara].MP -= fieldMoves.Base.Mp;
+                SkillShow();
+                warpPointPanel.SetActive(false);
+                yield return StartCoroutine(DialogManager.Instance.TypeDialog($"{fieldMoves.Base.Name}を使った"));
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                yield return StartCoroutine(FadeController.Instance.WarpFadeOut());
+                Vector3 vector = warpPoint.WarpPoints[selectedWarpPoint].WarpPoint.position;
+                player.transform.position = vector;
+                CameraManager.Instance.transform.position = vector;
+                yield return StartCoroutine(warp.WarpStart(warpPoint.WarpPoints[selectedWarpPoint]));
+                yield return StartCoroutine(FadeController.Instance.WarpFadeIn());
+                descriptionPanel.SetActive(false);
+                DialogManager.Instance.Close();
+                GameController.Instance.StartSelect();
+                yield break;
+            }
         }
     }
+
 
 
     public void SkillCharaSelectOpen()
@@ -514,6 +638,8 @@ public class FieldSkillController : MonoBehaviour
     public void SkillSelectOpen()
     {
         state = SkillStatus.SkillSelect;
+        skillUseCharaPanel.SetActive(false);
+        skillCharaPanel.SetActive(false);
         skillPanel.SetActive(true);
         SkillInit();
     }
@@ -523,6 +649,20 @@ public class FieldSkillController : MonoBehaviour
         skillPanel.SetActive(false);
         descriptionPanel.SetActive(false);
         SkillCharaSelectOpen();
+    }
+    public void WarpPointSelectOpen()
+    {
+        state = SkillStatus.WarpPointSelect;
+        warpPointPanel.SetActive(true);
+        skillPanel.SetActive(false);
+        descriptionPanel.SetActive(false);
+        WarpPointInit();
+    }
+
+    public void WarpPointSelectClose()
+    {
+        warpPointPanel.SetActive(false);
+        SkillSelectOpen();
     }
     public void UseSkillCharaSelectOpen()
     {

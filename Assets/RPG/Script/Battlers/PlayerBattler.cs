@@ -12,10 +12,10 @@ public class PlayerBattler : BattlerBase
     Battler battler;
 
     [SerializeField]
-    private ItemBase equipWeapon = null;
+    private ItemBase setequipWeapon = null;
     //　装備している鎧
     [SerializeField]
-    private ItemBase equipArmor = null;
+    private ItemBase setequipArmor = null;
     //　アイテムと個数のDictionary
     [SerializeField]
     private ItemDictionary itemDictionary = null;
@@ -24,22 +24,22 @@ public class PlayerBattler : BattlerBase
 
     public void SetEquipWeapon(ItemBase weaponItem)
     {
-        this.equipWeapon = weaponItem;
+        this.setequipWeapon = weaponItem;
     }
 
     public new ItemBase GetEquipWeapon()
     {
-        return equipWeapon;
+        return setequipWeapon;
     }
 
     public void SetEquipArmor(ItemBase armorItem)
     {
-        this.equipArmor = armorItem;
+        this.setequipArmor = armorItem;
     }
 
     public new ItemBase GetEquipArmor()
     {
-        return equipArmor;
+        return setequipArmor;
     }
 
     public void CreateItemDictionary(ItemDictionary itemDictionary)

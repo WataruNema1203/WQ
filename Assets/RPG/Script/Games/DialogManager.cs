@@ -3,25 +3,28 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using TMPro;
 
 public class DialogManager : MonoBehaviour
 {
     [SerializeField] GameObject dialogBox;
     [SerializeField] GameObject battleDialogBox;
-    [SerializeField] Text dialogText;
-    [SerializeField] Text battleDialogText;
-    [SerializeField] Text nameText;
+    [SerializeField] TMP_Text dialogText;
+    [SerializeField] TMP_Text battleDialogText;
     [SerializeField] float letterPerSecond = 0.05f;
 
     public UnityAction OnShowDialog;
     public UnityAction OnCloseDialog;
     public UnityAction OnDialogFinished;
+    public UnityAction<List<Item>, int> OnShopDialogFinished;
 
     bool isTyping;
-    bool isBattle = true;
+    bool isItem = false;
     int currentLine;
     [SerializeField] Dialog dialog;
-    Line enpty;
+    readonly Line enpty;
+    List<Item> items;
+    int shopNpcIndex;
 
     public static DialogManager Instance { get; private set; }
 
@@ -30,40 +33,70 @@ public class DialogManager : MonoBehaviour
         Instance = this;
     }
 
+
     public IEnumerator ShowDialog(Dialog dialog, UnityAction OnFinished = null)
     {
         for (int i = 0; i < dialog.Lines.Count; i++)
         {
+            string str = dialog.Lines[i].Log;
             this.dialog.Lines.Add(dialog.Lines[i]);
-            Debug.Log(i);
-
         }
+        this.OnShopDialogFinished = null;
         this.OnDialogFinished = OnFinished;
         this.OnShowDialog?.Invoke();
-        isBattle = false;
-        yield return TypeDialog(dialog.Lines[currentLine].Log);
+        yield return TypeDialog(dialog.Lines[currentLine].Log, false);
+    }
+    public IEnumerator ShopShowDialog(Dialog dialog, List<Item> items, int index, UnityAction<List<Item>, int> OnFinished = null)
+    {
+        for (int i = 0; i < dialog.Lines.Count; i++)
+        {
+            this.dialog.Lines.Add(dialog.Lines[i]);
+        }
+        this.OnDialogFinished = null;
+        this.shopNpcIndex = index;
+        this.items = items;
+        this.OnShopDialogFinished = OnFinished;
+        this.OnShowDialog?.Invoke();
+        yield return TypeDialog(dialog.Lines[currentLine].Log, false);
     }
 
-    public IEnumerator TypeDialog(string line, bool auto = true)
+    public IEnumerator ItemShowDialog(string line, UnityAction OnFinished = null)
+    {
+        dialog.Lines.Add(enpty);
+        this.OnShopDialogFinished = null;
+        this.OnDialogFinished = OnFinished;
+        this.OnShowDialog?.Invoke();
+        isItem = true;
+        yield return TypeDialog(line, false);
+    }
+
+    public IEnumerator TypeDialog(string line, bool isBattle = true, bool auto = true)
     {
         if (isBattle)
         {
             dialog.Lines.Add(enpty);
             battleDialogBox.SetActive(true);
             battleDialogText.text = "";
-
         }
         else
         {
             dialogBox.SetActive(true);
             dialogText.text = "";
-            nameText.text = "";
         }
         isTyping = true;
         yield return null;
-        if (!isBattle)
+        if (isItem)
         {
-            nameText.text = $"y{dialog.Lines[currentLine].BattlerBase.Name}z";
+            foreach (var letter in line)
+            {
+                dialogText.text += letter;
+
+                yield return new WaitForSeconds(letterPerSecond);
+            }
+
+        }
+        else if (!isBattle)
+        {
             foreach (var letter in line)
             {
                 dialogText.text += letter;
@@ -92,7 +125,7 @@ public class DialogManager : MonoBehaviour
             dialog.Lines.Clear();
         }
     }
-    public IEnumerator FieldTypeDialog(string line, bool auto = true)
+    public IEnumerator FieldTypeDialog(string line, bool auto = false)
     {
         dialog.Lines.Add(enpty);
         battleDialogBox.SetActive(true);
@@ -113,11 +146,13 @@ public class DialogManager : MonoBehaviour
         }
         isTyping = false;
         dialog.Lines.Clear();
+        PlayerController.Instance.StartPlayer();
+        Close();
     }
 
     public void StartTypingDialog(string line)
     {
-        StartCoroutine(TypeDialog(line));
+        StartCoroutine(TypeDialog(line, true));
     }
 
     public void HandleUpdate()
@@ -127,16 +162,17 @@ public class DialogManager : MonoBehaviour
             currentLine++;
             if (currentLine < dialog.Lines.Count)
             {
-                StartCoroutine(TypeDialog(dialog.Lines[currentLine].Log));
+                StartCoroutine(TypeDialog(dialog.Lines[currentLine].Log, false));
             }
             else
             {
                 // ‰ï˜bI—¹
                 currentLine = 0;
-                isBattle = true;
+                isItem = false;
                 dialog.Lines.Clear();
                 dialogBox.SetActive(false);
                 battleDialogBox.SetActive(false);
+                OnShopDialogFinished?.Invoke(items, shopNpcIndex);
                 OnDialogFinished?.Invoke();
                 OnCloseDialog?.Invoke();
             }

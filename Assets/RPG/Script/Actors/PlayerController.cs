@@ -4,34 +4,55 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Events;
 
+enum PlayerState
+{
+    FreeRoam,
+    WarpPointSet,
+    Event,
+}
+
 public class PlayerController : MonoBehaviour
 {
+    PlayerState playerState;
     bool isMoving;
     bool isSelect;
-    Vector2 input;
+    bool isShip;
+    [SerializeField] Vector2 input;
     float moveSpeed = 5;
-    public int encountMod = 5;//エンカウント率0-100%
+    public int encountMod = -105;//エンカウント率0-100%
+    int originalEncountMod = 5;
     float count;
     float encountSkill;
-    Animator animator;
+    Animator charaAnimation;
 
 
-    public UnityAction<Battler> OnEncounts;//Encountしたときに実行したい関数を登録できる
+    public UnityAction<List<Battler>> OnEncounts;//Encountしたときに実行したい関数を登録できる
 
     [SerializeField] List<Battler> battlers = new List<Battler>();
-
+    [SerializeField] List<Battler> enemyBattlers = new List<Battler>();
     public List<Battler> Battlers { get => battlers; }
     public int EncountMod { get => encountMod; set => encountMod = value; }
     public float EncountSkill { get => encountSkill; set => encountSkill = value; }
+    internal PlayerState PlayerState { get => playerState; set => playerState = value; }
+
+    public static PlayerController Instance { get; private set; }
+    public bool IsSelect { get => isSelect; }
+    public List<Battler> EnemyBattlers { get => enemyBattlers; }
+    public int OriginalEncountMod { get => originalEncountMod; }
 
     private void Awake()
     {
-        animator = GetComponent<Animator>();
+        charaAnimation = GetComponent<Animator>();
     }
     private void Start()
     {
+        playerState = PlayerState.FreeRoam;
         Battlers[0].Init();
         isSelect = false;
+        if (Instance == null)
+        {
+            Instance = this;
+        }
 
     }
 
@@ -43,58 +64,42 @@ public class PlayerController : MonoBehaviour
 
     public void HandleUpdate()
     {
-        if (!isMoving && !isSelect)
+        if (playerState == PlayerState.FreeRoam)
         {
-            input.x = Input.GetAxisRaw("Horizontal");
-            input.y = Input.GetAxisRaw("Vertical");
-
-
-            if (input.x != 0)
+            if (!isMoving && !isSelect)
             {
-                input.y = 0;
+                input.x = Input.GetAxisRaw("Horizontal");
+                input.y = Input.GetAxisRaw("Vertical");
+
+
+                if (input.x != 0)
+                {
+                    input.y = 0;
+                }
+
+                if (input != Vector2.zero)
+                {
+                    StartCoroutine(Move(input));
+                    charaAnimation.SetFloat("x", input.x);
+                    charaAnimation.SetFloat("y", input.y);
+                }
             }
-
-            if (input != Vector2.zero)
-            {
-                StartCoroutine(Move(input));
-                animator.SetFloat("x", input.x);
-                animator.SetFloat("y", input.y);
-            }
-        }
-        animator.SetBool("IsMoving", isMoving);
-
-        if (Input.GetKeyDown(KeyCode.Z) && !isSelect)
-        {
-            Interact();
+            charaAnimation.SetBool("IsMoving", isMoving);
         }
 
-        if (Input.GetKeyDown(KeyCode.C))
-        {
-            moveSpeed = 10;
-            CameraManager.Instance.Movespeed = 10;
-            encountMod += 5;
-        }
-        if (Input.GetKeyUp(KeyCode.C))
-        {
-            moveSpeed = 5;
-            encountMod -= 5;
-            CameraManager.Instance.Movespeed = 5;
-        }
-
-        if (!isSelect)
-        {
-            StoryInteract();
-        }
     }
-
     public void StartPlayer()
     {
+        encountMod = originalEncountMod;
         isSelect = false;
+        isMoving = false;
+        playerState = PlayerState.FreeRoam;
     }
     public void StartSelect()
     {
         isSelect = true;
     }
+
 
     IEnumerator Move(Vector2 moveVec)
     {
@@ -119,9 +124,8 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
-        transform.position = targetPos;
-        CheckForEncounters();
         EncountSkillCount();
+        OnEventCheck();
     }
 
     public void EncountSkillCount()
@@ -134,7 +138,6 @@ public class PlayerController : MonoBehaviour
                 encountMod = 5;
                 encountSkill = 0;
                 count = 0;
-                Debug.Log("効果切れ");
                 return;
             }
         }
@@ -148,56 +151,128 @@ public class PlayerController : MonoBehaviour
         {
             if (Random.Range(0, 100) < encountMod)
             {
-                if (Input.GetKey(KeyCode.C))
+                for (int i = 0; i < (Random.Range(1, 6)); i++)
                 {
-                    moveSpeed = 10;
-                    CameraManager.Instance.Movespeed = 10;
-                    encountMod -= 5;
+                    enemyBattlers.Add(collider2D.GetComponent<EncountArea>().GetRandomBattler());
                 }
-
-                OnEncounts?.Invoke(collider2D.GetComponent<EncountArea>().GetRandomBattler());
-                animator.SetBool("IsMoving", false);
+                OnEncounts?.Invoke(enemyBattlers);
             }
         }
         isMoving = false;
     }
 
-    void Interact()
+    public void Interact()
     {
-        Vector3 faceDirection = new Vector3(animator.GetFloat("x"), animator.GetFloat("y"));
+        Vector3 faceDirection = new Vector3(charaAnimation.GetFloat("x"), charaAnimation.GetFloat("y"));
 
         Vector3 interactPos = transform.position + faceDirection;
 
-        Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.3f, GameLayers.Instance.InteractableLayer);
+        Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.1f, GameLayers.Instance.InteractableLayer);
         if (collider2D)
         {
+            originalEncountMod = encountMod;
             isSelect = true;
             collider2D.GetComponent<IInteract>().Interact(transform);
         }
-
     }
 
 
-    void StoryInteract()
+    public void OnEventCheck()
     {
-        Vector3 faceDirection = new Vector3(animator.GetFloat("x"), animator.GetFloat("y"));
+        Vector3 faceDirection = new Vector3(charaAnimation.GetFloat("x"), charaAnimation.GetFloat("y"));
 
         Vector3 interactPos = transform.position + faceDirection;
 
-        Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.5f, GameLayers.Instance.StoryLayer);
-        if (collider2D)
+        Collider2D colliderStory = Physics2D.OverlapCircle(interactPos, 0.1f, GameLayers.Instance.StoryLayer);
+        Collider2D colliderMove = Physics2D.OverlapCircle(interactPos, 0.1f, GameLayers.Instance.MovePoint);
+        Collider2D colliderWorldMove = Physics2D.OverlapCircle(interactPos, 0.1f, GameLayers.Instance.WorldMovePoint);
+        Collider2D colliderMap = Physics2D.OverlapCircle(interactPos, 0.1f, GameLayers.Instance.MapChangeLayer);
+        if (colliderStory)
         {
+            originalEncountMod = encountMod;
             isSelect = true;
-            collider2D.GetComponent<IStoryInteract>().StoryInteract(dialog:null);
+            isMoving = true;
+            colliderStory.GetComponent<EventController>().Call();
         }
+        else if (colliderMove)
+        {
+            originalEncountMod = encountMod;
+            isSelect = true;
+            StartCoroutine(colliderMove.GetComponent<MovePointBase>().MoveMap());
+            isMoving = false;
 
+        }
+        else if (colliderWorldMove)
+        {
+            originalEncountMod = encountMod;
+            isSelect = true;
+            StartCoroutine(colliderWorldMove.GetComponent<WorldMapMovePoint>().MoveMap());
+            isMoving = false;
+
+        }
+        else if (colliderMap)
+        {
+            colliderMap.GetComponent<MapController>().MapChanges();
+
+        }
+        else
+        {
+            CheckForEncounters();
+        }
+    }
+    public void WarpFlag()
+    {
+        if (playerState == PlayerState.FreeRoam)
+        {
+            Vector3 faceDirection = new Vector3(charaAnimation.GetFloat("x"), charaAnimation.GetFloat("y"));
+
+            Vector3 interactPos = transform.position + faceDirection;
+
+            Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.5f, GameLayers.Instance.WarpPointLayer);
+            if (collider2D)
+            {
+                playerState = PlayerState.WarpPointSet;
+                originalEncountMod = encountMod;
+                isSelect = true;
+                StartCoroutine(collider2D.GetComponent<WarpPointBase>().SetPoint());
+            }
+        }
+    }
+    public void HiddenItem()
+    {
+        if (playerState == PlayerState.FreeRoam)
+        {
+            Vector3 faceDirection = new Vector3(charaAnimation.GetFloat("x"), charaAnimation.GetFloat("y"));
+
+            Vector3 interactPos = transform.position + faceDirection;
+
+            Collider2D collider2D = Physics2D.OverlapCircle(interactPos, 0.1f, GameLayers.Instance.HiddenItemLayer);
+            if (collider2D)
+            {
+                originalEncountMod = encountMod;
+                isSelect = true;
+                StartCoroutine(collider2D.GetComponent<HiddenItemBase>().GiveItem());
+            }
+        }
     }
 
 
     //いまから移動する位置に移動できるか判定する関数
     bool IsWalkable(Vector2 targetPos)
     {
-        return Physics2D.OverlapCircle(targetPos, 0.2f, GameLayers.Instance.SolidObjectsLayer | GameLayers.Instance.InteractableLayer) == false;
+        if (isShip)
+        {
+        return Physics2D.OverlapCircle(targetPos, 0.2f, GameLayers.Instance.SolidObjectsLayer | GameLayers.Instance.WarpPointLayer | GameLayers.Instance.InteractableLayer ) == false;
+        }
+        else
+        {
+            return Physics2D.OverlapCircle(targetPos, 0.2f, GameLayers.Instance.SolidObjectsLayer | GameLayers.Instance.WarpPointLayer | GameLayers.Instance.InteractableLayer | GameLayers.Instance.EnemyField_Sea) == false;
+        }
+    }
+
+    public void SetPlayerPosition(Vector3 vector3)
+    {
+        this.gameObject.transform.position = vector3;
     }
 
 }

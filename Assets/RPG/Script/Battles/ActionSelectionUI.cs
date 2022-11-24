@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 public class ActionSelectionUI: MonoBehaviour
 {
@@ -8,6 +10,8 @@ public class ActionSelectionUI: MonoBehaviour
     //たたかうorにげるのどちらを選択中かを把握して色を変える
 
     SelectableText[] selectableTexts;
+    [SerializeField] TextMeshProUGUI CharaName;
+    [SerializeField] GameObject CharaNamePanel;
 
     int selectedIndex = 0; //0:たたかう 1:にげる　を選択している
 
@@ -43,13 +47,16 @@ public class ActionSelectionUI: MonoBehaviour
         selectedIndex = Mathf.Clamp(selectedIndex, 0, 3);
     }
 
-    public void Open()
+    public void Open(Battler battler)
     {
         gameObject.SetActive(true);
+        CharaNamePanel.SetActive(true);
+        CharaName.text = battler.Base.Name;
     }
 
     public void Close()
     {
+        CharaNamePanel.SetActive(false);
         gameObject.SetActive(false);
     }
 

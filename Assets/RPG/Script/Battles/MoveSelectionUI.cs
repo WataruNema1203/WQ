@@ -14,6 +14,7 @@ public class MoveSelectionUI : MonoBehaviour
     [SerializeField] SelectableText moveTextPrefab;
     //‹Z‚Ì”‚¾‚¯UI‚ªL‚Ñ‚é‚æ‚¤‚É‚·‚é
     [SerializeField] RectTransform moveParent;
+    [SerializeField] RectTransform uiParent;
 
     //‚½‚½‚©‚¤or‚É‚°‚é‚Ì‚Ç‚¿‚ç‚ğ‘I‘ğ’†‚©‚ğ”cˆ¬‚µ‚ÄF‚ğ•Ï‚¦‚é
     readonly List<SelectableText> slots = new List<SelectableText>();
@@ -39,6 +40,7 @@ public class MoveSelectionUI : MonoBehaviour
         Vector2 uiSize = moveParent.sizeDelta;
         uiSize.y = 30 + 30 * moves.Count;
         moveParent.sizeDelta = uiSize;
+        uiParent.sizeDelta = uiSize;
 
         for (int i = 0; i < moves.Count; i++)
         {
@@ -59,6 +61,7 @@ public class MoveSelectionUI : MonoBehaviour
         Vector2 preSize = moveParent.sizeDelta;
         preSize.y = INIT_HIGHT + RANGE * moves.Count;
         moveParent.sizeDelta = preSize;
+        uiParent.sizeDelta = preSize;
         foreach (var move in moves)
         {
             SelectableText selectableText = Instantiate(moveTextPrefab, moveParent);

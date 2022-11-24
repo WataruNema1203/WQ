@@ -16,7 +16,6 @@ public class ConditionDB
                 StartMessage="は吐きそうになった",
                 OnAfterTurn=(Battler target) =>
                 {
-                    Debug.Log("//弱継続ダメージ");
                     //弱継続ダメージを与える
                     target.HP-=target.MaxHP/16;
                     //弱継続ダメージのログを出す
@@ -33,7 +32,6 @@ public class ConditionDB
                 StartMessage="は吐き始めた",
                 OnAfterTurn=(Battler target) =>
                 {
-                    Debug.Log("//猛毒ダメージ");
                     //やけどダメージを与える
                     target.HP-=target.MaxHP/8;
                     //やけどダメージのログを出す
@@ -50,7 +48,6 @@ public class ConditionDB
                 StartMessage="はフラフラで歩き始めた",
                 OnAfterTurn=(Battler target) =>
                 {
-                    Debug.Log("//やけどダメージ");
                     //やけどダメージを与える
                     target.HP-=target.MaxHP/16;
                     //やけどダメージのログを出す

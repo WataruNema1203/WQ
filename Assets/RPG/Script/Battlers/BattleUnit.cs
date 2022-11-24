@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using DG.Tweening;
 
 
@@ -12,15 +13,15 @@ public class BattleUnit : MonoBehaviour
     //Battlerの管理
     public Battler Battler { get; set; }
     public Image Image { get => image; }
-    public Text NameText { get => nameText; }
-
-    Vector3 originalPos;
+    public TextMeshProUGUI NameText { get => nameText; }
+    Color originalColor;
 
     [SerializeField] Image image;
-    [SerializeField] Image image1;
-    [SerializeField] Image image2;
-    [SerializeField] Text nameText;
-
+    [SerializeField] TextMeshProUGUI nameText;
+    private void Awake()
+    {
+        originalColor = image.color;
+    }
 
     public virtual void Setup(Battler battler)
     {
@@ -35,30 +36,26 @@ public class BattleUnit : MonoBehaviour
 
     }
 
-    //登場アニメーション
-    public void PlayerResetAnimation()
+    public void SetImage()
     {
-        Sequence sequence = DOTween.Sequence();
-        sequence.Append(transform.DOLocalMoveY(originalPos.y + 150f, 0f));
-        sequence.Join(image.DOFade(255, 0f));
-        sequence.Join(image1.DOFade(255, 0f));
-        sequence.Join(image2.DOFade(255, 0f));
-        sequence.Join(NameText.DOFade(255, 0f));
+        this.image = GetComponent<Image>();
+        return;
+    }
+
+    //明度初期化
+    public void ResetAnimation()
+    {
+        image.color = originalColor;
 
     }
 
-    //戦闘不能アニメーション
-    public void PlayerFaintAnimaion()
+    public IEnumerator FadeBattleOver()
     {
-        //下に下がりながら、薄くなる
-        Sequence sequence = DOTween.Sequence();
-        sequence.Append(transform.DOLocalMoveY(originalPos.y - 150f, 0.5f));
-        sequence.Join(image.DOFade(0, 0.5f));
-        sequence.Join(image1.DOFade(0, 0.5f));
-        sequence.Join(image2.DOFade(0, 0.5f));
-        sequence.Join(NameText.DOFade(0, 0.5f));
-
+        yield return image.DOFade(
+           0,     // フェード後のアルファ値
+          1f      // 演出時間
+       );
+        image.color = originalColor;
     }
-
 
 }

@@ -1,8 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.Events;
+using Fungus;
 
 public class BattleSystem : MonoBehaviour
 {
@@ -15,6 +15,10 @@ public class BattleSystem : MonoBehaviour
         AminaMoveSelection,
         PlayerItemSelection,
         AminaItemSelection,
+        PlayerEnemySelection,
+        AminaEnemySelection,
+        PlayerSelfMoveSelection,
+        AminaSelfMoveSelection,
         RunTurns,
         BattleOver,
         Escape,
@@ -26,6 +30,7 @@ public class BattleSystem : MonoBehaviour
         None,
         PlayerAttack,
         PlayerItem,
+        PlayerSelf,
     }
 
     enum AminaActionPattern
@@ -33,6 +38,7 @@ public class BattleSystem : MonoBehaviour
         None,
         AminaAttack,
         AminaItem,
+        AminaSelf,
     }
 
 
@@ -43,17 +49,17 @@ public class BattleSystem : MonoBehaviour
     [SerializeField] ActionSelectionUI actionSelectionUI;
     [SerializeField] MoveSelectionUI playerMoveSelectionUI;
     [SerializeField] MoveSelectionUI aminaMoveSelectionUI;
+    [SerializeField] CharaSelectionUI charaSelectionUI;
+    [SerializeField] EnemySelectionUI enemySelectionUI;
     [SerializeField] InventoryUI inventoryUI;
 
+    [SerializeField] EnemyUnitManager enemyUnitManager;
     [SerializeField] BattleUnit playerUnit;
     [SerializeField] BattleUnit aminaUnit;
-    [SerializeField] BattleUnit enemyUnit;
 
     public UnityAction<bool> OnBattleOver;
     public UnityAction<Item> OnDropItem;
     bool isBossBattle;
-    bool playerLive;
-    bool aminaLive;
     int playerActionIndex;
     int aminaActionIndex;
     int playerMoveIndex;
@@ -65,6 +71,10 @@ public class BattleSystem : MonoBehaviour
     int aminaItemSelectIndex;
     int playerUseCharaSelect;
     int aminaUseCharaSelect;
+    int playerEnemySelect;
+    int aminaEnemySelect;
+    int playerSelfMoveSelect;
+    int aminaSelfMoveSelect;
 
 
     public void HandleUpdate()
@@ -85,6 +95,18 @@ public class BattleSystem : MonoBehaviour
             case PatternState.AminaMoveSelection:
                 HandleAminaMoveSelection();
                 break;
+            case PatternState.PlayerEnemySelection:
+                HandlePlayerEnemySelection();
+                break;
+            case PatternState.AminaEnemySelection:
+                HandleAminaEnemySelection();
+                break;
+            case PatternState.PlayerSelfMoveSelection:
+                HandlePlayerSelfSelection();
+                break;
+            case PatternState.AminaSelfMoveSelection:
+                HandleAminaSelfSelection();
+                break;
             case PatternState.PlayerItemSelection:
                 HandlePlayerItemSelection();
                 break;
@@ -99,14 +121,11 @@ public class BattleSystem : MonoBehaviour
         }
     }
 
-    public void BattleStart(PlayerController player, Battler enemy, bool isBossBattle = false)
+    public void BattleStart(PlayerController player, List<Battler> enemes, bool isBossBattle = false)
     {
-        battleOverMenber = 0;
-        playerLive = true;
-        aminaLive = true;
+        gameObject.SetActive(true);
         this.isBossBattle = isBossBattle;
         state = PatternState.Start;
-        gameObject.SetActive(true);
         actionSelectionUI.Init();
         playerMoveSelectionUI.SetText(player.Battlers[0].Moves);
         if (player.Battlers.Count == 2)
@@ -114,33 +133,46 @@ public class BattleSystem : MonoBehaviour
             aminaMoveSelectionUI.SetText(player.Battlers[1].Moves);
         }
         PlayerActionSelection();
-        StartCoroutine(SetupBattle(player, enemy));
+        StartCoroutine(SetupBattle(player, enemes));
     }
 
 
-    IEnumerator SetupBattle(PlayerController player, Battler enemy)
+    IEnumerator SetupBattle(PlayerController player, List<Battler> enemes)
     {
         playerActionPattern = PlayerActionPattern.None;
         aminaActionPattern = AminaActionPattern.None;
         playerUnit.Setup(player.Battlers[0]);
+        yield return StartCoroutine(enemyUnitManager.Init(enemes));
+        enemySelectionUI.Init(enemyUnitManager.EnemyUnits);
         if (player.Battlers.Count == 2)
         {
             aminaUnit.gameObject.SetActive(true);
             aminaUnit.Setup(player.Battlers[1]);
+            aminaUnit.Battler.isDai = false;
         }
-        enemyUnit.Setup(enemy);
-        state = PatternState.Busy;
-        yield return DialogManager.Instance.TypeDialog($"{enemy.Base.Name}が現れた！");
-        if (playerUnit.Battler.HP <= 0 && playerLive == true)
+        else
         {
-            playerLive = false;
-            battleOverMenber++;
+            playerUnit.Battler.isDai = false;
+        }
+        state = PatternState.Busy;
+        if (enemes.Count == 1)
+        {
+            yield return DialogManager.Instance.TypeDialog($"{enemes[0].Base.Name}が現れた！");
+        }
+        else
+        {
+            yield return DialogManager.Instance.TypeDialog("モンスター達が現れた！");
+
+        }
+        yield return new WaitForSeconds(0.2f);
+        if (playerUnit.Battler.HP <= 0 && playerUnit.Battler.isDai == false)
+        {
+            playerUnit.Battler.isDai = true;
             if (player.Battlers.Count == 2)
             {
-                if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
+                if (aminaUnit.Battler.HP <= 0 && aminaUnit.Battler.isDai == true)
                 {
-                    aminaLive = false;
-                    battleOverMenber++;
+                    aminaUnit.Battler.isDai = false;
                     yield return DialogManager.Instance.TypeDialog($"戦えるメンバーがいない・・・\n今は戦闘を避けよう");
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                     yield return null;
@@ -149,7 +181,7 @@ public class BattleSystem : MonoBehaviour
                 else
                 {
                     playerActionPattern = PlayerActionPattern.None;
-                    StartCoroutine(DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は何の反応もない・・・\nアミナはどうする？"));
+                    StartCoroutine(DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は何の反応もない・・・\n" + $"{aminaUnit.Battler.Base.Name}" + "はどうする？"));
                     AminaActionSelection();
 
 
@@ -179,19 +211,21 @@ public class BattleSystem : MonoBehaviour
         state = PatternState.BattleOver;
         playerMoveSelectionUI.DeleteMoveText();
         aminaMoveSelectionUI.DeleteMoveText();
+        enemyUnitManager.Cler();
+        enemySelectionUI.BattleOver();
         OnBattleOver?.Invoke(win);
     }
 
     void PlayerActionSelection()
     {
         state = PatternState.PlayerActionSelection;
-        actionSelectionUI.Open();
+        actionSelectionUI.Open(PlayerController.Instance.Battlers[0]);
     }
     void AminaActionSelection()
     {
         state = PatternState.AminaActionSelection;
         playerMoveSelectionUI.Close();
-        actionSelectionUI.Open();
+        actionSelectionUI.Open(PlayerController.Instance.Battlers[1]);
     }
     void PlayerMoveSelection()
     {
@@ -204,6 +238,18 @@ public class BattleSystem : MonoBehaviour
         state = PatternState.AminaMoveSelection;
         actionSelectionUI.Close();
         aminaMoveSelectionUI.Open();
+    }
+    void PlayerSelfMoveSelection()
+    {
+        DialogManager.Instance.Close();
+        state = PatternState.PlayerSelfMoveSelection;
+        charaSelectionUI.Open(PlayerController.Instance);
+    }
+    void AminaSelfMoveSelection()
+    {
+        DialogManager.Instance.Close();
+        state = PatternState.AminaSelfMoveSelection;
+        charaSelectionUI.Open(PlayerController.Instance);
     }
     void PlayerItemSelection()
     {
@@ -218,44 +264,35 @@ public class BattleSystem : MonoBehaviour
         inventoryUI.ItemSelectOpen();
     }
 
+    void PlayerEnemySelection()
+    {
+        DialogManager.Instance.Close();
+        state = PatternState.PlayerEnemySelection;
+        enemySelectionUI.Open(enemyUnitManager.EnemyUnits);
+    }
+    void AminaEnemySelection()
+    {
+        DialogManager.Instance.Close();
+        state = PatternState.AminaEnemySelection;
+        enemySelectionUI.Open(enemyUnitManager.EnemyUnits);
+    }
+
     void HandlePlayerActionSelection()
     {
-        if (playerUnit.Battler.HP <= 0 && playerLive == true)
+        if (playerUnit.Battler.HP <= 0 && playerUnit.Battler.isDai == false)
         {
-            playerLive = false;
-            battleOverMenber++;
+            playerUnit.Battler.isDai = true;
             if (aminaUnit.gameObject.activeSelf == true)
             {
-                if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
+                if (aminaUnit.Battler.HP <= 0 && aminaUnit.Battler.isDai == true)
                 {
-                    aminaLive = false;
-                    battleOverMenber++;
                     StartCoroutine(DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は何の反応もない・・・"));
                     state = PatternState.Escape;
                 }
                 else
                 {
                     playerActionPattern = PlayerActionPattern.None;
-                    StartCoroutine(DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は何の反応もない・・・\nアミナはどうする？"));
-                    AminaActionSelection();
-
-
-                }
-            }
-        }
-        else if (playerLive == false)
-        {
-            if (aminaUnit.gameObject.activeSelf == true)
-            {
-                if (aminaLive == false)
-                {
-
-                    StartCoroutine(DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は何の反応もない・・・"));
-                    state = PatternState.Escape;
-                }
-                else
-                {
-                    StartCoroutine(DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は何の反応もない・・・\nアミナはどうする？"));
+                    StartCoroutine(DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は何の反応もない・・・\n" + $"{aminaUnit.Battler.Base.Name}" + "はどうする？"));
                     AminaActionSelection();
 
 
@@ -270,30 +307,9 @@ public class BattleSystem : MonoBehaviour
                 playerActionIndex = actionSelectionUI.SelectedIndex;
                 if (playerActionIndex == 0)
                 {
+                    playerActionPattern = PlayerActionPattern.PlayerAttack;
+                    PlayerEnemySelection();
 
-                    if (aminaUnit.gameObject.activeSelf == true)
-                    {
-                        if (aminaUnit.Battler.HP <= 0)
-                        {
-                            playerActionPattern = PlayerActionPattern.PlayerAttack;
-                            battleOverMenber++;
-                            StartCoroutine(DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は何の反応もない・・・"));
-                            aminaActionPattern = AminaActionPattern.None;
-                            StartCoroutine(RunTurns());
-                        }
-                        else
-                        {
-                            playerActionPattern = PlayerActionPattern.PlayerAttack;
-                            AminaActionSelection();
-                            StartCoroutine(DialogManager.Instance.TypeDialog("アミナはどうする？"));
-                        }
-                    }
-                    else
-                    {
-                        playerActionPattern = PlayerActionPattern.PlayerAttack;
-                        actionSelectionUI.Close();
-                        StartCoroutine(RunTurns());
-                    }
                 }
                 else if (playerActionIndex == 1)
                 {
@@ -328,7 +344,7 @@ public class BattleSystem : MonoBehaviour
             {
                 aminaActionPattern = AminaActionPattern.AminaAttack;
                 actionSelectionUI.Close();
-                StartCoroutine(RunTurns());
+                AminaEnemySelection();
             }
             else if (aminaActionIndex == 1)
             {
@@ -353,7 +369,7 @@ public class BattleSystem : MonoBehaviour
         }
         else if (Input.GetKeyDown(KeyCode.X))
         {
-            if (playerLive == true)
+            if (playerUnit.Battler.isDai == false)
             {
                 PlayerActionSelection();
             }
@@ -374,32 +390,50 @@ public class BattleSystem : MonoBehaviour
             int useMP = playerUnit.Battler.Moves[playerMoveIndex].Base.Mp;
             if (useMP <= playerUnit.Battler.MP)
             {
-                if (GameController.Instance.GetBattlerMember() == 2)
+                if (playerUnit.Battler.Moves[playerMoveIndex].Base.Category1 == MoveCategory1.FullHeal ||
+                    playerUnit.Battler.Moves[playerMoveIndex].Base.Category1 == MoveCategory1.Heal || playerUnit.Battler.Moves[playerMoveIndex].Base.Category1 == MoveCategory1.Resuscitation)
                 {
+                    playerActionPattern = PlayerActionPattern.PlayerSelf;
                     playerMoveSelectionUI.Close();
-                    if (aminaLive == true)
+                    PlayerSelfMoveSelection();
+                }
+                else if (playerUnit.Battler.Moves[playerMoveIndex].Base.Category1 == MoveCategory1.All)
+                {
+                    if (aminaUnit.gameObject.activeSelf == true)
                     {
-                        playerActionPattern = PlayerActionPattern.PlayerAttack;
-                        AminaActionSelection();
+                        if (aminaUnit.Battler.isDai == true)
+                        {
+
+                            StartCoroutine(DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は何の反応もない・・・"));
+                            aminaActionPattern = AminaActionPattern.None;
+                            StartCoroutine(RunTurn());
+                        }
+                        else
+                        {
+
+                            playerActionPattern = PlayerActionPattern.PlayerAttack;
+                            playerMoveSelectionUI.Close();
+                            StartCoroutine(DialogManager.Instance.TypeDialog($"{ aminaUnit.Battler.Base.Name}はどうする？"));
+                            AminaActionSelection();
+                        }
                     }
                     else
                     {
                         playerActionPattern = PlayerActionPattern.PlayerAttack;
-                        // 技リストから技を出す
-                        StartCoroutine(RunTurns());
+                        playerMoveSelectionUI.Close();
+                        StartCoroutine(RunTurn());
                     }
                 }
                 else
                 {
                     playerActionPattern = PlayerActionPattern.PlayerAttack;
                     playerMoveSelectionUI.Close();
-                    // 技リストから技を出す
-                    StartCoroutine(RunTurns());
+                    PlayerEnemySelection();
                 }
             }
             else
             {
-                StartCoroutine(DialogManager.Instance.TypeDialog($"MPが足りない"));
+                StartCoroutine(DialogManager.Instance.TypeDialog($"MPが足りない!"));
             }
         }
         else if (Input.GetKeyDown(KeyCode.X))
@@ -418,31 +452,29 @@ public class BattleSystem : MonoBehaviour
             int useMP = aminaUnit.Battler.Moves[aminaMoveIndex].Base.Mp;
             if (useMP <= aminaUnit.Battler.MP)
             {
-                aminaMoveSelectionUI.Close();
-                if (GameController.Instance.GetBattlerMember() == 2)
+                if (aminaUnit.Battler.Moves[aminaMoveIndex].Base.Category1 == MoveCategory1.FullHeal ||
+                    aminaUnit.Battler.Moves[aminaMoveIndex].Base.Category1 == MoveCategory1.Heal || aminaUnit.Battler.Moves[aminaMoveIndex].Base.Category1 == MoveCategory1.Resuscitation)
                 {
-                    if (playerLive == true)
-                    {
-                        aminaActionPattern = AminaActionPattern.AminaAttack;
-                        StartCoroutine(RunTurns());
-                    }
-                    else
-                    {
-                        aminaActionPattern = AminaActionPattern.AminaAttack;
-                        // 技リストから技を出す
-                        StartCoroutine(RunTurns());
-                    }
+                    aminaMoveSelectionUI.Close();
+                    aminaActionPattern = AminaActionPattern.AminaSelf;
+                    AminaSelfMoveSelection();
+                }
+                else if (aminaUnit.Battler.Moves[aminaMoveIndex].Base.Category1 == MoveCategory1.All)
+                {
+                    aminaMoveSelectionUI.Close();
+                    aminaActionPattern = AminaActionPattern.AminaAttack;
+                    StartCoroutine(RunTurn());
                 }
                 else
                 {
+                    aminaMoveSelectionUI.Close();
                     aminaActionPattern = AminaActionPattern.AminaAttack;
-                    // 技リストから技を出す
-                    StartCoroutine(RunTurns());
+                    AminaEnemySelection();
                 }
             }
             else
             {
-                StartCoroutine(DialogManager.Instance.TypeDialog($"MPが足りない"));
+                StartCoroutine(DialogManager.Instance.TypeDialog($"MPが足りない!"));
             }
         }
         else if (Input.GetKeyDown(KeyCode.X))
@@ -452,6 +484,162 @@ public class BattleSystem : MonoBehaviour
         }
 
     }
+    void HandlePlayerEnemySelection()
+    {
+        enemySelectionUI.HandleUpdate();
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            playerEnemySelect = enemySelectionUI.SelectedIndex;
+            if (enemyUnitManager.EnemyUnits[playerEnemySelect].Battler.HP > 0)
+            {
+                enemySelectionUI.Close();
+                if (playerActionPattern == PlayerActionPattern.PlayerAttack)
+                {
+                    if (playerActionIndex == 0)
+                    {
+                        actionSelectionUI.Close();
+                        if (aminaUnit.gameObject.activeSelf == true)
+                        {
+                            if (aminaUnit.Battler.isDai == true)
+                            {
+
+                                StartCoroutine(DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は何の反応もない・・・"));
+                                aminaActionPattern = AminaActionPattern.None;
+                                StartCoroutine(RunTurn());
+                            }
+                            else
+                            {
+                                StartCoroutine(DialogManager.Instance.TypeDialog($"{ aminaUnit.Battler.Base.Name}はどうする？"));
+                                AminaActionSelection();
+                            }
+                        }
+                        else
+                        {
+                            StartCoroutine(RunTurn());
+                        }
+                    }
+                    else if (playerActionIndex == 1)
+                    {
+                        playerMoveSelectionUI.Close();
+                        if (GameController.Instance.GetBattlerMember() == 2)
+                        {
+                            if (aminaUnit.Battler.isDai == false)
+                            {
+                                StartCoroutine(DialogManager.Instance.TypeDialog($"{ aminaUnit.Battler.Base.Name}はどうする？"));
+                                AminaActionSelection();
+                            }
+                            else
+                            {
+                                // 技リストから技を出す
+                                StartCoroutine(RunTurn());
+                            }
+                        }
+                        else
+                        {
+                            // 技リストから技を出す
+                            StartCoroutine(RunTurn());
+                        }
+                    }
+                }
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            StartCoroutine(DialogManager.Instance.TypeDialog("どうする？"));
+            enemySelectionUI.Close();
+            PlayerActionSelection();
+        }
+
+    }
+    void HandleAminaEnemySelection()
+    {
+        enemySelectionUI.HandleUpdate();
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            aminaEnemySelect = enemySelectionUI.SelectedIndex;
+            if (enemyUnitManager.EnemyUnits[aminaEnemySelect].Battler.HP > 0)
+            {
+                enemySelectionUI.Close();
+                if (aminaActionPattern == AminaActionPattern.AminaAttack)
+                {
+                    StartCoroutine(RunTurn());
+                }
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            enemySelectionUI.Close();
+            AminaActionSelection();
+        }
+    }
+
+    void HandlePlayerSelfSelection()
+    {
+        charaSelectionUI.HandleUpdate();
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            playerSelfMoveSelect = charaSelectionUI.SelectedIndex;
+            if (PlayerController.Instance.Battlers[playerSelfMoveSelect].HP != PlayerController.Instance.Battlers[playerSelfMoveSelect].MaxHP)
+            {
+                charaSelectionUI.Close();
+                if (playerActionPattern == PlayerActionPattern.PlayerAttack)
+                {
+                    if (GameController.Instance.GetBattlerMember() == 2)
+                    {
+                        if (aminaUnit.Battler.isDai == false)
+                        {
+                            StartCoroutine(DialogManager.Instance.TypeDialog($"{ aminaUnit.Battler.Base.Name}はどうする？"));
+                            AminaActionSelection();
+                        }
+                        else
+                        {
+                            // 技リストから技を出す
+                            StartCoroutine(RunTurn());
+                        }
+                    }
+                    else
+                    {
+                        // 技リストから技を出す
+                        StartCoroutine(RunTurn());
+                    }
+                }
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            StartCoroutine(DialogManager.Instance.TypeDialog("どうする？"));
+            charaSelectionUI.Close();
+            PlayerActionSelection();
+        }
+
+    }
+    void HandleAminaSelfSelection()
+    {
+        charaSelectionUI.HandleUpdate();
+
+        if (Input.GetKeyDown(KeyCode.Z))
+        {
+            aminaSelfMoveSelect = charaSelectionUI.SelectedIndex;
+            if (PlayerController.Instance.Battlers[aminaSelfMoveSelect].HP != PlayerController.Instance.Battlers[aminaSelfMoveSelect].MaxHP)
+            {
+                charaSelectionUI.Close();
+                if (aminaActionPattern == AminaActionPattern.AminaSelf)
+                {
+                    StartCoroutine(RunTurn());
+                }
+            }
+        }
+        else if (Input.GetKeyDown(KeyCode.X))
+        {
+            StartCoroutine(DialogManager.Instance.TypeDialog("どうする？"));
+            charaSelectionUI.Close();
+            AminaActionSelection();
+        }
+    }
+
     void HandlePlayerItemSelection()
     {
         inventoryUI.HandleUpdateItemSelection();
@@ -477,7 +665,7 @@ public class BattleSystem : MonoBehaviour
                 playerUseCharaSelect = inventoryUI.SelectedItemUseChara;
                 inventoryUI.UseItemCharaSelectClose();
                 inventoryUI.ItemSelectClose();
-                StartCoroutine(RunTurns());
+                StartCoroutine(RunTurn());
             }
         }
         else if (Input.GetKeyDown(KeyCode.X))
@@ -510,16 +698,8 @@ public class BattleSystem : MonoBehaviour
                 aminaUseCharaSelect = inventoryUI.SelectedItemUseChara;
                 inventoryUI.UseItemCharaSelectClose();
                 inventoryUI.ItemSelectClose();
-                if (playerLive == false)
-                {
-                    aminaActionPattern = AminaActionPattern.AminaItem;
-                    StartCoroutine(RunTurns());
-                }
-                else
-                {
-                    aminaActionPattern = AminaActionPattern.AminaItem;
-                    StartCoroutine(RunTurns());
-                }
+                aminaActionPattern = AminaActionPattern.AminaItem;
+                StartCoroutine(RunTurn());
             }
         }
         else if (Input.GetKeyDown(KeyCode.X))
@@ -556,659 +736,233 @@ public class BattleSystem : MonoBehaviour
         state = PatternState.PlayerActionSelection;
     }
 
-    IEnumerator RunTurns()
+    IEnumerator RunTurn()
     {
-        int mod = Random.Range(0, 2);
-        bool isWin = false;
-        if (aminaActionPattern == AminaActionPattern.None && playerActionPattern == PlayerActionPattern.PlayerAttack)
+        battleOverMenber = PlayerController.Instance.Battlers.Count;
+        bool isAmina = (aminaUnit.gameObject.activeSelf);
+        int playerIndex = 0;
+        int aminaIndex = 0;
+        Debug.Log(isAmina);
+        List<BattleUnit> attackers = new List<BattleUnit>
         {
-            state = PatternState.RunTurns;
-            Move playerMove = playerUnit.Battler.Moves[playerMoveIndex];
-            Debug.Log("プレイヤーターン");
-            if (playerActionIndex == 0)
-            {
-                yield return RunNormalMove(playerUnit, enemyUnit);
+            playerUnit,
+        };
 
-            }
-            else
-            {
-                yield return RunMove(playerUnit, enemyUnit, playerMove);
-            }
 
-            //戦闘不能ならメッセージ
-            if (enemyUnit.Battler.HP <= 0)
-            {
-                state = PatternState.BattleOver;
-                playerUnit.Battler.OnBattleOver();
-            }
-
-            if (state == PatternState.BattleOver)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}を潰した");
-                enemyUnit.PlayerFaintAnimaion();
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //倒した敵からその敵に設定しておいた経験値を得る
-                playerUnit.Battler.HasExp += (enemyUnit.Battler.Level * enemyUnit.Battler.Base.Exp) / 7;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(playerUnit);
-                //ゴールド獲得
-                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //ドロップアイテム取得
-                yield return DropItemCheck();
-                BattleOver(isWin);
-                enemyUnit.PlayerResetAnimation();
-                yield break;
-            }
-            if (mod == 0)
-            {
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                yield return RunMove(enemyUnit, playerUnit, enemyMove);
-            }
-            else if (mod == 1)
-            {
-                Debug.Log("モンスターターン");
-                yield return RunNormalMove(enemyUnit, playerUnit);
-            }
-            if (battleOverMenber == GameController.Instance.GetBattlerMember())
-            {
-                yield return DialogManager.Instance.TypeDialog("全員潰れて行方が分からなくなった・・・");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                BattleOver(!isWin);
-                yield break;
-            }
-
+        if (battleOverMenber > 1)
+        {
+            attackers.Add(aminaUnit);
         }
-        else if (aminaActionPattern == AminaActionPattern.AminaAttack && playerActionPattern == PlayerActionPattern.None)
+
+        attackers.AddRange(enemyUnitManager.EnemyUnits);
+
+        for (int i = PlayerController.Instance.Battlers.Count; i < attackers.Count; i++)
         {
-            state = PatternState.RunTurns;
-            Move aminaMove = aminaUnit.Battler.Moves[aminaMoveIndex];
-            Debug.Log("プレイヤーターン");
-            if (playerActionIndex == 0)
-            {
-                yield return RunNormalMove(aminaUnit, enemyUnit);
-
-            }
-            else
-            {
-                yield return RunMove(aminaUnit, enemyUnit, aminaMove);
-            }
-
-
-            //戦闘不能ならメッセージ
-            if (enemyUnit.Battler.HP <= 0)
-            {
-                state = PatternState.BattleOver;
-                aminaUnit.Battler.OnBattleOver();
-            }
-
-            if (state == PatternState.BattleOver)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}を潰した");
-                enemyUnit.PlayerFaintAnimaion();
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //倒した敵からその敵に設定しておいた経験値を得る
-                aminaUnit.Battler.HasExp += (enemyUnit.Battler.Level * enemyUnit.Battler.Base.Exp) / 7;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(aminaUnit);
-                //ゴールド獲得
-                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //ドロップアイテム取得
-                yield return DropItemCheck();
-                BattleOver(isWin);
-                enemyUnit.PlayerResetAnimation();
-                yield break;
-            }
-            if (mod == 0)
-            {
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                yield return RunMove(enemyUnit, aminaUnit, enemyMove);
-            }
-            else if (mod == 1)
-            {
-                Debug.Log("モンスターターン");
-                yield return RunNormalMove(enemyUnit, aminaUnit);
-            }
-            if (battleOverMenber == GameController.Instance.GetBattlerMember())
-            {
-                yield return DialogManager.Instance.TypeDialog("全員潰れて行方が分からなくなった・・・");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                BattleOver(!isWin);
-                yield break;
-            }
-
+            Debug.Log(attackers[i].Battler.Name);
         }
-        else if (playerActionPattern == PlayerActionPattern.PlayerItem && aminaActionPattern == AminaActionPattern.AminaAttack)
+
+        attackers.Sort((a, b) =>
         {
-            Debug.Log("PlayerItemAminaAttack");
-            state = PatternState.RunTurns;
-            Move aminaMove = aminaUnit.Battler.Moves[aminaMoveIndex];
-            Debug.Log("プレイヤーターン");
-            yield return inventoryUI.UseInBattle(itemSelectPlayer, playerItemSelectIndex, playerUseCharaSelect);
-            playerUnit.Setup(playerUnit.Battler);
-            aminaUnit.Setup(aminaUnit.Battler);
-            Debug.Log("アミナターン");
-            if (aminaActionIndex == 0)
-            {
-                yield return RunNormalMove(aminaUnit, enemyUnit);
+            int result = b.Battler.Speed - a.Battler.Speed;
+            return result;
+        });
 
-            }
-            else
-            {
-                yield return RunMove(aminaUnit, enemyUnit, aminaMove);
-            }
-
-            //戦闘不能ならメッセージ
-            if (enemyUnit.Battler.HP <= 0)
-            {
-                state = PatternState.BattleOver;
-                playerUnit.Battler.OnBattleOver();
-            }
-
-            if (state == PatternState.BattleOver)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}を潰した");
-                enemyUnit.PlayerFaintAnimaion();
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //倒した敵からその敵に設定しておいた経験値を得る
-                playerUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                aminaUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(playerUnit);
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(aminaUnit);
-                //ゴールド獲得
-                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //ドロップアイテム取得
-                yield return DropItemCheck();
-                BattleOver(isWin);
-                enemyUnit.PlayerResetAnimation();
-                yield break;
-            }
-            if (mod == 0)
-            {
-                int modTarget = Random.Range(0, 1);
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunMove(enemyUnit, playerUnit, enemyMove);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunMove(enemyUnit, aminaUnit, enemyMove);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (mod == 1)
-            {
-                int modTarget = Random.Range(0, 1);
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunNormalMove(enemyUnit, playerUnit);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunNormalMove(enemyUnit, aminaUnit);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (battleOverMenber == GameController.Instance.GetBattlerMember())
-            {
-                yield return DialogManager.Instance.TypeDialog($"全員潰れて行方が分からなくなった・・・");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                BattleOver(!isWin);
-                yield break;
-            }
-
+        for (int i = 0; i < attackers.Count; i++)
+        {
+            Debug.Log($"ソート後{attackers[i].Battler.Name}");
         }
-        else if (playerActionPattern == PlayerActionPattern.PlayerAttack && aminaActionPattern == AminaActionPattern.AminaItem)
+        for (int i = 0; i < attackers.Count; i++)
         {
-            Debug.Log("PlayerAttackAminaItem");
-            state = PatternState.RunTurns;
-            Move playerMove = playerUnit.Battler.Moves[playerMoveIndex];
-            Move aminaMove = aminaUnit.Battler.Moves[aminaMoveIndex];
-            Debug.Log("プレイヤーターン");
-            if (playerActionIndex == 0)
+            if (attackers[i].Battler.Base.CharaTypes.Chara == CharaType.Player)
             {
-                yield return RunNormalMove(playerUnit, enemyUnit);
-
+                playerIndex = i;
             }
-            else
+            else if (attackers[i].Battler.Base.CharaTypes.Chara == CharaType.Amina)
             {
-                yield return RunMove(playerUnit, enemyUnit, playerMove);
-            }
-
-            //戦闘不能ならメッセージ
-            if (enemyUnit.Battler.HP <= 0)
-            {
-                state = PatternState.BattleOver;
-                playerUnit.Battler.OnBattleOver();
-            }
-
-            if (state == PatternState.BattleOver)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}を潰した");
-                enemyUnit.PlayerFaintAnimaion();
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //倒した敵からその敵に設定しておいた経験値を得る
-                playerUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                aminaUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(playerUnit);
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(aminaUnit);
-                //ゴールド獲得
-                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //ドロップアイテム取得
-                yield return DropItemCheck();
-                BattleOver(isWin);
-                enemyUnit.PlayerResetAnimation();
-                yield break;
-            }
-            Debug.Log("アミナアイテムターン");
-            yield return inventoryUI.UseInBattle(itemSelectAmina, aminaItemSelectIndex, aminaUseCharaSelect);
-            playerUnit.Setup(playerUnit.Battler);
-            aminaUnit.Setup(aminaUnit.Battler);
-            if (mod == 0)
-            {
-                int modTarget = Random.Range(0, 1);
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunMove(enemyUnit, playerUnit, enemyMove);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunMove(enemyUnit, aminaUnit, enemyMove);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (mod == 1)
-            {
-                int modTarget = Random.Range(0, 1);
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunNormalMove(enemyUnit, playerUnit);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunNormalMove(enemyUnit, aminaUnit);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (battleOverMenber == GameController.Instance.GetBattlerMember())
-            {
-                yield return DialogManager.Instance.TypeDialog($"全員潰れて行方が分からなくなった・・・");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                BattleOver(!isWin);
-                yield break;
-            }
-
-        }
-        else if (playerActionPattern == PlayerActionPattern.PlayerItem && aminaActionPattern == AminaActionPattern.AminaItem)
-        {
-            Debug.Log("PlayerItemAminaItem");
-            state = PatternState.RunTurns;
-            Debug.Log("プレイヤーターン");
-            yield return inventoryUI.UseInBattle(itemSelectPlayer, playerItemSelectIndex, playerUseCharaSelect);
-            playerUnit.Setup(playerUnit.Battler);
-            aminaUnit.Setup(aminaUnit.Battler);
-            Debug.Log("アミナアイテムターン");
-            yield return inventoryUI.UseInBattle(itemSelectAmina, aminaItemSelectIndex, aminaUseCharaSelect);
-            playerUnit.Setup(playerUnit.Battler);
-            aminaUnit.Setup(aminaUnit.Battler);
-            if (mod == 0)
-            {
-                int modTarget = Random.Range(0, 1);
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunMove(enemyUnit, playerUnit, enemyMove);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunMove(enemyUnit, aminaUnit, enemyMove);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (mod == 1)
-            {
-                int modTarget = Random.Range(0, 1);
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunNormalMove(enemyUnit, playerUnit);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunNormalMove(enemyUnit, aminaUnit);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (battleOverMenber == GameController.Instance.GetBattlerMember())
-            {
-                yield return DialogManager.Instance.TypeDialog($"全員潰れて行方が分からなくなった・・・");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                BattleOver(!isWin);
-                yield break;
-            }
-
-        }
-        else if (aminaActionPattern == AminaActionPattern.None && playerActionPattern == PlayerActionPattern.PlayerItem)
-        {
-            Debug.Log("AminaNone");
-            state = PatternState.RunTurns;
-            actionSelectionUI.Close();
-            inventoryUI.ItemSelectClose();
-            yield return null;
-            yield return inventoryUI.UseInBattle(itemSelectPlayer, playerItemSelectIndex, playerUseCharaSelect);
-            playerUnit.Setup(playerUnit.Battler);
-            if (GameController.Instance.GetBattlerMember() == 2)
-            {
-                aminaUnit.Setup(aminaUnit.Battler);
-            }
-            if (mod == 0)
-            {
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                yield return RunMove(enemyUnit, playerUnit, enemyMove);
-            }
-            else if (mod == 1)
-            {
-                Debug.Log("モンスターターン");
-                yield return RunNormalMove(enemyUnit, playerUnit);
-            }
-            if (playerLive == false)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-
-
-                BattleOver(!isWin);
-                yield break;
+                aminaIndex = i;
             }
         }
-        else if (aminaActionPattern == AminaActionPattern.AminaItem && playerActionPattern == PlayerActionPattern.None)
+        state = PatternState.RunTurns;
+        for (int i = 0; i < attackers.Count; i++)
         {
-            Debug.Log("PlayerNone");
-            state = PatternState.RunTurns;
-            actionSelectionUI.Close();
-            inventoryUI.ItemSelectClose();
-            yield return null;
-            yield return inventoryUI.UseInBattle(itemSelectAmina, aminaItemSelectIndex, aminaUseCharaSelect);
-            playerUnit.Setup(playerUnit.Battler);
-            aminaUnit.Setup(aminaUnit.Battler);
-            if (mod == 0)
+            Debug.Log($"{i + 1}体目");
+            if (attackers[i].Battler.Base.CharaTypes.Chara == CharaType.Enemy && attackers[i].Battler.isDai == false)
             {
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                yield return RunMove(enemyUnit, playerUnit, enemyMove);
-            }
-            else if (mod == 1)
-            {
-                Debug.Log("モンスターターン");
-                yield return RunNormalMove(enemyUnit, playerUnit);
-            }
-            if (aminaLive == false)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
+                int mod = Random.Range(0, 2);
+                if (mod == 0)
+                {
+                    int modTarget = Random.Range(0, 2);
+                    Move enemyMove = attackers[i].Battler.GetRandomMove();
+                    if (modTarget == 0)
+                    {
+                        yield return RunMove(attackers[i], attackers[playerIndex], enemyMove);
 
+                    }
+                    else if (modTarget == 1)
+                    {
+                        yield return RunMove(attackers[i], attackers[aminaIndex], enemyMove);
+                    }
+                }
+                else if (mod == 1)
+                {
+                    int modTarget = Random.Range(0, 2);
+                    if (modTarget == 0)
+                    {
+                        yield return RunNormalMove(attackers[i], attackers[playerIndex]);
+                    }
+                    else if (modTarget == 1)
+                    {
+                        yield return RunNormalMove(attackers[i], attackers[aminaIndex]);
+                    }
+                }
+                if (attackers[playerIndex].Battler.HP <= 0 && playerUnit.Battler.isDai == true && attackers[playerIndex].Battler.Base.CharaTypes.Chara == CharaType.Player)
+                {
+                    playerUnit.Battler.isDai = false;
+                    yield return DialogManager.Instance.TypeDialog($"{attackers[playerIndex].Battler.Name}は倒れて意識を失った...");
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                }
+                else if (attackers[aminaIndex].Battler.HP <= 0 && aminaUnit.Battler.isDai == true && attackers[playerIndex].Battler.Base.CharaTypes.Chara == CharaType.Amina)
+                {
+                    aminaUnit.Battler.isDai = false;
+                    yield return DialogManager.Instance.TypeDialog($"{attackers[aminaIndex].Battler.Name}は倒れて意識を失った...");
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
 
-                BattleOver(!isWin);
-                yield break;
+                }
+                for (int j = 0; j < PlayerController.Instance.Battlers.Count; j++)
+                {
+                    if (PlayerController.Instance.Battlers[j].HP <= 0)
+                    {
+                        battleOverMenber--;
+                    }
+                }
+                if (battleOverMenber <= 0)
+                {
+                    yield return DialogManager.Instance.TypeDialog($"全員潰れて行方が分からなくなった・・・");
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    BattleOver(false);
+                }
+                continue;
+
             }
+            else if (attackers[i].Battler.Base.CharaTypes.Chara == CharaType.Player && attackers[i].Battler.isDai == false)
+            {
+                if (playerActionPattern == PlayerActionPattern.PlayerItem)
+                {
+                    yield return inventoryUI.UseInBattle(itemSelectPlayer, playerItemSelectIndex, playerUseCharaSelect);
+                    attackers[playerIndex].Setup(attackers[playerIndex].Battler);
+                    attackers[aminaIndex].Setup(attackers[aminaIndex].Battler);
+                }
+                else if (playerActionPattern == PlayerActionPattern.PlayerAttack)
+                {
+                    Move playerMove = attackers[playerIndex].Battler.Moves[playerMoveIndex];
+                    if (isAmina == true)
+                    {
+                        if (playerActionIndex == 0)
+                        {
+                            yield return RunNormalMove(attackers[playerIndex], enemyUnitManager.EnemyUnits[playerEnemySelect]);
+                            yield return OnCheckBattleOver(attackers, playerEnemySelect, playerIndex, aminaIndex, aminaUnit.Battler.isDai);
+                        }
+                        else
+                        {
+
+                            if (playerMove.Base.Category1 == MoveCategory1.All)
+                            {
+                                yield return RunAllMove(attackers[playerIndex], attackers, playerMove);
+                                yield return OnCheckBattleOver(attackers, playerEnemySelect, playerIndex, aminaIndex, aminaUnit.Battler.isDai, true);
+                            }
+                            else
+                            {
+                                yield return RunMove(attackers[playerIndex], enemyUnitManager.EnemyUnits[playerEnemySelect], playerMove);
+                                yield return OnCheckBattleOver(attackers, playerEnemySelect, playerIndex, aminaIndex, aminaUnit.Battler.isDai);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (playerActionIndex == 0)
+                        {
+                            yield return RunNormalMove(attackers[playerIndex], enemyUnitManager.EnemyUnits[playerEnemySelect]);
+                            yield return OnCheckBattleOver(attackers, playerEnemySelect, playerIndex, aminaIndex, false, isAmina);
+                        }
+                        else
+                        {
+                            if (playerMove.Base.Category1 == MoveCategory1.All)
+                            {
+                                yield return RunAllMove(attackers[playerIndex], attackers, playerMove);
+                                yield return OnCheckBattleOver(attackers, playerEnemySelect, playerIndex, aminaIndex, false, isAmina);
+                            }
+                            else
+                            {
+                                yield return RunMove(attackers[playerIndex], enemyUnitManager.EnemyUnits[playerEnemySelect], playerMove);
+                                yield return OnCheckBattleOver(attackers, playerEnemySelect, playerIndex, aminaIndex, false, isAmina);
+                            }
+                        }
+
+                    }
+                }
+            }
+            else if (attackers[i].Battler.Base.CharaTypes.Chara == CharaType.Amina && attackers[i].Battler.isDai == false)
+            {
+                if (aminaActionPattern == AminaActionPattern.AminaItem)
+                {
+                    yield return inventoryUI.UseInBattle(itemSelectAmina, aminaItemSelectIndex, aminaUseCharaSelect);
+                    attackers[playerIndex].Setup(attackers[playerIndex].Battler);
+                    attackers[aminaIndex].Setup(attackers[aminaIndex].Battler);
+
+                }
+                else if (aminaActionPattern == AminaActionPattern.AminaAttack)
+                {
+                    Move aminaMove = attackers[aminaIndex].Battler.Moves[aminaMoveIndex];
+                    if (aminaActionIndex == 0)
+                    {
+                        yield return RunNormalMove(attackers[aminaIndex], enemyUnitManager.EnemyUnits[aminaEnemySelect]);
+                        yield return OnCheckBattleOver(attackers, aminaEnemySelect, aminaIndex, playerIndex, playerUnit.Battler.isDai);
+
+                    }
+                    else
+                    {
+                        if (aminaMove.Base.Category1 == MoveCategory1.All)
+                        {
+                            yield return RunAllMove(attackers[aminaIndex], attackers, aminaMove);
+                            yield return OnCheckBattleOver(attackers, aminaEnemySelect, aminaIndex, playerIndex, playerUnit.Battler.isDai, true);
+                        }
+                        else
+                        {
+                            yield return RunMove(attackers[aminaIndex], enemyUnitManager.EnemyUnits[aminaEnemySelect], aminaMove);
+                            yield return OnCheckBattleOver(attackers, aminaEnemySelect, aminaIndex, playerIndex, playerUnit.Battler.isDai);
+                        }
+                    }
+                }
+
+            }
+            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
         }
-        else if (aminaActionPattern == AminaActionPattern.AminaAttack && playerActionPattern == PlayerActionPattern.PlayerAttack)
-        {
-            state = PatternState.RunTurns;
-            Move playerMove = playerUnit.Battler.Moves[playerMoveIndex];
-            Move aminaMove = aminaUnit.Battler.Moves[aminaMoveIndex];
-            Debug.Log("プレイヤーターン");
-            if (playerActionIndex == 0)
-            {
-                yield return RunNormalMove(playerUnit, enemyUnit);
 
-            }
-            else
-            {
-                yield return RunMove(playerUnit, enemyUnit, playerMove);
-            }
-
-            //戦闘不能ならメッセージ
-            if (enemyUnit.Battler.HP <= 0)
-            {
-                state = PatternState.BattleOver;
-                playerUnit.Battler.OnBattleOver();
-            }
-
-            if (state == PatternState.BattleOver)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}を潰した");
-                enemyUnit.PlayerFaintAnimaion();
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //倒した敵からその敵に設定しておいた経験値を得る
-                playerUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                aminaUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(playerUnit);
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(aminaUnit);
-                //ゴールド獲得
-                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //ドロップアイテム取得
-                yield return DropItemCheck();
-                BattleOver(isWin);
-                enemyUnit.PlayerResetAnimation();
-                yield break;
-            }
-            Debug.Log("アミナターン");
-            if (aminaActionIndex == 0)
-            {
-                yield return RunNormalMove(aminaUnit, enemyUnit);
-
-            }
-            else
-            {
-                yield return RunMove(aminaUnit, enemyUnit, aminaMove);
-            }
-
-            //戦闘不能ならメッセージ
-            if (enemyUnit.Battler.HP <= 0)
-            {
-                state = PatternState.BattleOver;
-                playerUnit.Battler.OnBattleOver();
-            }
-
-            if (state == PatternState.BattleOver)
-            {
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}を潰した");
-                enemyUnit.PlayerFaintAnimaion();
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //倒した敵からその敵に設定しておいた経験値を得る
-                playerUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                aminaUnit.Battler.HasExp += (enemyUnit.Battler.Base.Exp) / 2;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(playerUnit);
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は{enemyUnit.Battler.Base.Exp / 2}リットルの酒を飲み切った！");
-                //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
-                yield return OnLevelUp(aminaUnit);
-                //ゴールド獲得
-                playerUnit.Battler.Gold += enemyUnit.Battler.Base.Gold;
-                yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Gold}G手に入れた");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                //ドロップアイテム取得
-                yield return DropItemCheck();
-                BattleOver(isWin);
-                enemyUnit.PlayerResetAnimation();
-                yield break;
-            }
-            if (mod == 0)
-            {
-                int modTarget = Random.Range(0, 1);
-                Move enemyMove = enemyUnit.Battler.GetRandomMove();
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunMove(enemyUnit, playerUnit, enemyMove);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunMove(enemyUnit, aminaUnit, enemyMove);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (mod == 1)
-            {
-                int modTarget = Random.Range(0, 1);
-                Debug.Log("モンスターターン");
-                if (modTarget == 0)
-                {
-                    yield return RunNormalMove(enemyUnit, playerUnit);
-                }
-                else if (modTarget == 1)
-                {
-                    yield return RunNormalMove(enemyUnit, aminaUnit);
-                }
-            }
-            if (playerUnit.Battler.HP <= 0 && playerLive == true)
-            {
-                playerLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-            if (aminaUnit.Battler.HP <= 0 && aminaLive == true)
-            {
-                aminaLive = false;
-                yield return DialogManager.Instance.TypeDialog($"{aminaUnit.Battler.Base.Name}は潰れて意識を失った...");
-            }
-
-            if (battleOverMenber == GameController.Instance.GetBattlerMember())
-            {
-                yield return DialogManager.Instance.TypeDialog($"全員潰れて行方が分からなくなった・・・");
-                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-                BattleOver(!isWin);
-                yield break;
-            }
-
-        }
         yield return DialogManager.Instance.TypeDialog("どうする？");
         PlayerActionSelection();
     }
 
     IEnumerator DropItemCheck()
     {
-        if (Random.Range(0, 100) <= enemyUnit.Battler.Base.DropItem1.Chance)
+        for (int i = 0; i < enemyUnitManager.EnemyUnits.Count; i++)
         {
-            yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}が宝箱を落とした");
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-            OnDropItem?.Invoke(enemyUnit.Battler.Base.DropItem1.DropItem);
-            yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.DropItem1.DropItem.Base.GetKanjiName()}を拾った！");
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-        }
-        if (Random.Range(0, 100) <= enemyUnit.Battler.Base.DropItem2.Chance)
-        {
-            yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.Name}が宝箱を落とした");
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
-            OnDropItem?.Invoke(enemyUnit.Battler.Base.DropItem2.DropItem);
-            yield return DialogManager.Instance.TypeDialog($"{enemyUnit.Battler.Base.DropItem2.DropItem.Base.GetKanjiName()}を拾った！");
-            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+            if (Random.Range(0, 100) <= enemyUnitManager.EnemyUnits[i].Battler.Base.DropItem1.Chance)
+            {
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnitManager.EnemyUnits[i].Battler.Name}が宝箱を落とした");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                OnDropItem?.Invoke(enemyUnitManager.EnemyUnits[i].Battler.Base.DropItem1.DropItem);
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnitManager.EnemyUnits[i].Battler.Base.DropItem1.DropItem.Base.GetKanjiName()}を拾った！");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+            }
+            if (Random.Range(0, 100) <= enemyUnitManager.EnemyUnits[i].Battler.Base.DropItem2.Chance)
+            {
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnitManager.EnemyUnits[i].Battler.Name}が宝箱を落とした");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                OnDropItem?.Invoke(enemyUnitManager.EnemyUnits[i].Battler.Base.DropItem2.DropItem);
+                yield return DialogManager.Instance.TypeDialog($"{enemyUnitManager.EnemyUnits[i].Battler.Base.DropItem2.DropItem.Base.GetKanjiName()}を拾った！");
+                yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+            }
+
         }
 
     }
@@ -1224,8 +978,7 @@ public class BattleSystem : MonoBehaviour
             //技が使えない場合でダメージを受ける場合もある（こんらん）
             yield break;
         }
-        Debug.Log("実行");
-        yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Base.Name}は{move.Base.Name}をつかった", auto: false);
+        yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Name}は{move.Base.Name}をつかった", auto: false);
         sourceUnit.Battler.MP -= move.Base.Mp;
         sourceUnit.UpdateUI();
         yield return new WaitForSeconds(0.2f);
@@ -1240,7 +993,8 @@ public class BattleSystem : MonoBehaviour
         else
         {
             //targetへのdamage計算
-            DamageDetailes damageDetailes = targetUnit.Battler.TakeDamage(move, sourceUnit.Battler, targetUnit.Battler);
+            DamageDetailes damageDetailes;
+            damageDetailes = targetUnit.Battler.TakeDamage(move, sourceUnit.Battler, targetUnit.Battler);
             string resultText = targetUnit.Battler.ResultText;
             yield return DialogManager.Instance.TypeDialog(resultText);
 
@@ -1263,19 +1017,84 @@ public class BattleSystem : MonoBehaviour
                 }
             }
         }
+        if (targetUnit.Battler.HP <= 0 && targetUnit.Battler.Base.CharaTypes.Chara == CharaType.Enemy && targetUnit.Battler.isDai == false)
+        {
+            targetUnit.Battler.isDai = true;
+        }
 
         sourceUnit.UpdateUI();
         targetUnit.UpdateUI();
 
-
-        //戦闘不能ならメッセージ
-        if (targetUnit.Battler.HP <= 0)
-        {
-            battleOverMenber++;
-            sourceUnit.Battler.OnBattleOver();
-        }
         yield return RunAfterTurn(sourceUnit);
         yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+    }
+
+    //技の実装（実行するUnit、対象Unit,技）
+    IEnumerator RunAllMove(BattleUnit sourceUnit, List<BattleUnit> targetUnit, Move move)
+    {
+        bool canRunMove = sourceUnit.Battler.OnBeforeMove();　//TODO:技を使うモンスター(sourceUnit)が動けるかどうか
+        yield return ShowStatusChanges(sourceUnit.Battler);
+        List<BattleUnit> units = new List<BattleUnit>();
+        units.AddRange(targetUnit);
+        units.Sort((a, b) =>
+        {
+            int result = a.Battler.Base.CharaTypes.EnemyNumber - b.Battler.Base.CharaTypes.EnemyNumber;
+            return result != 0 ? result : a.Battler.BattlerIndex - b.Battler.BattlerIndex;
+        });
+
+        if (!canRunMove)
+        {
+            //技が使えない場合でダメージを受ける場合もある（こんらん）
+            yield break;
+        }
+        yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Name}は{move.Base.Name}をつかった", auto: false);
+        sourceUnit.Battler.MP -= move.Base.Mp;
+        sourceUnit.UpdateUI();
+        yield return new WaitForSeconds(0.2f);
+
+        DamageDetailes damageDetailes = null;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            if (units[i].Battler.isDai == false && units[i].Battler.Base.CharaTypes.Chara == CharaType.Enemy)
+            {
+                //targetへのdamage計算
+                damageDetailes = units[i].Battler.TakeDamage(move, sourceUnit.Battler, units[i].Battler);
+                string resultText = units[i].Battler.ResultText;
+                yield return DialogManager.Instance.TypeDialog(resultText);
+
+                //追加効果チェック
+                //move.Base.Secondariesがnullではない
+                //move.Base.Secondariesがある
+                //ターゲットがやられていない
+                if (move.Base.Secondaries != null && move.Base.Secondaries.Count > 0 && units[i].Battler.HP > 0)
+                {
+                    //それぞれの追加効果を反映
+                    foreach (SecondaryEffects secondary in move.Base.Secondaries)
+                    {
+                        //一定確率で状態異常
+                        if (Random.Range(1, 101) <= secondary.Chance)
+                        {
+                            yield return RunMoveEffects(secondary, sourceUnit.Battler, units[i].Battler, move.Base.Target);
+                        }
+                    }
+                }
+                //クリティカルのメッセージ
+                yield return ShowDamageDetails(damageDetailes);
+                units[i].UpdateUI();
+            }
+            if (units[i].Battler.HP <= 0 && units[i].Battler.Base.CharaTypes.Chara == CharaType.Enemy && units[i].Battler.isDai == false)
+            {
+                units[i].Battler.isDai = true;
+                yield return StartCoroutine(units[i].FadeBattleOver());
+                yield return DialogManager.Instance.TypeDialog($"{units[i].Battler.Name}を倒した！");
+            }
+
+            sourceUnit.UpdateUI();
+
+            yield return RunAfterTurn(sourceUnit);
+            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+        }
     }
 
     //通常攻撃技の実装（実行するUnit、対象Unit,技）
@@ -1289,13 +1108,14 @@ public class BattleSystem : MonoBehaviour
             //技が使えない場合でダメージを受ける場合もある（こんらん）
             yield break;
         }
-        yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Base.Name}の通常攻撃！", auto: false);
+        yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Name}の通常攻撃！", auto: false);
         yield return new WaitForSeconds(0.2f);
 
 
 
         //Enemydamage計算
-        DamageDetailes damageDetailes = targetUnit.Battler.NormalAttackTakeDamage(sourceUnit.Battler, targetUnit.Battler);
+        DamageDetailes damageDetailes;
+        damageDetailes = targetUnit.Battler.NormalAttackTakeDamage(sourceUnit.Battler, targetUnit.Battler);
         string resultText = targetUnit.Battler.ResultText;
         yield return DialogManager.Instance.TypeDialog(resultText);
 
@@ -1306,11 +1126,9 @@ public class BattleSystem : MonoBehaviour
         targetUnit.UpdateUI();
 
 
-        //戦闘不能ならメッセージ
-        if (targetUnit.Battler.HP <= 0)
+        if (targetUnit.Battler.HP <= 0 && targetUnit.Battler.isDai == false)
         {
-            battleOverMenber++;
-            sourceUnit.Battler.OnBattleOver();
+            targetUnit.Battler.isDai = true;
         }
         yield return RunAfterTurn(sourceUnit);
         yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
@@ -1318,6 +1136,7 @@ public class BattleSystem : MonoBehaviour
 
     IEnumerator RunAfterTurn(BattleUnit sourceUnit)
     {
+
         if (sourceUnit.Battler.HP <= 0)
         {
             yield break;
@@ -1334,10 +1153,8 @@ public class BattleSystem : MonoBehaviour
         //戦闘不能ならメッセージ
         if (sourceUnit.Battler.HP <= 0)
         {
-            battleOverMenber++;
-            yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Base.Name}を潰した");
-            sourceUnit.PlayerFaintAnimaion();
-            yield return new WaitForSeconds(0.7f);
+            yield return DialogManager.Instance.TypeDialog($"{sourceUnit.Battler.Name}が倒れた");
+            sourceUnit.Battler.isDai = true;
             sourceUnit.Battler.OnBattleOver();
         }
     }
@@ -1404,19 +1221,154 @@ public class BattleSystem : MonoBehaviour
             //一定以上経験値がたまると、レベルが上がる
             if (playerUnit.Battler.IsLevelUp(playerUnit))
             {
-                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}はレベル{playerUnit.Battler.Level}になった！");
+                yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Name}はレベル{playerUnit.Battler.Level}になった！");
                 yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 //特定のレベルなら技を覚える
                 Move learnedMove = playerUnit.Battler.LearnedMove();
                 if (learnedMove != null)
                 {
-                    yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Base.Name}は{learnedMove.Base.Name}を覚えた！");
+                    yield return DialogManager.Instance.TypeDialog($"{playerUnit.Battler.Name}は{learnedMove.Base.Name}を覚えた！");
                     yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
                 }
             }
         }
     }
 
+    IEnumerator OnCheckBattleOver(List<BattleUnit> attackers, int enemySelectIndex, int sourceIndex, int partnerIndex, bool isDai, bool isPartner = true)
+    {
+        int sumExp = 0;
+        int sumGold = 0;
+        Move Move = null;
+        if (attackers[sourceIndex].Battler.Base.CharaTypes.Chara == CharaType.Player)
+        {
+            Move = attackers[sourceIndex].Battler.Moves[playerMoveIndex];
+        }
+        else if (attackers[sourceIndex].Battler.Base.CharaTypes.Chara == CharaType.Amina)
+        {
+            Move = attackers[sourceIndex].Battler.Moves[aminaMoveIndex];
+        }
+        //戦闘不能ならメッセージ
+        List<BattleUnit> units = new List<BattleUnit>();
+        units.AddRange(attackers);
+        units.Sort((a, b) =>
+        {
+            int result = a.Battler.Base.CharaTypes.EnemyNumber - b.Battler.Base.CharaTypes.EnemyNumber;
+            return result != 0 ? result : a.Battler.BattlerIndex - b.Battler.BattlerIndex;
+        });
+        for (int i = 0; i < units.Count; i++)
+        {
+            Debug.Log("2回目ソート後");
+            Debug.Log(units[i].Battler.Name);
 
+        }
+
+        if ((Move.Base.Category1 == MoveCategory1.All && attackers[sourceIndex].Battler.Base.CharaTypes.Chara == CharaType.Player && playerActionIndex == 1) ||
+            (Move.Base.Category1 == MoveCategory1.All && attackers[sourceIndex].Battler.Base.CharaTypes.Chara == CharaType.Amina && aminaActionIndex == 1))
+        {
+            int enemyKill = enemyUnitManager.EnemyUnits.Count;
+            for (int j = 0; j < units.Count; j++)
+            {
+                if (units[j].Battler.Base.CharaTypes.Chara == CharaType.Enemy && units[j].Battler.isDai == true)
+                {
+                    Debug.Log(enemyKill);
+                    enemyKill--;
+                }
+            }
+            if (enemyKill <= 0)
+            {
+                state = PatternState.BattleOver;
+                units[sourceIndex].Battler.OnBattleOver();
+                units[partnerIndex].Battler.OnBattleOver();
+            }
+
+        }
+        else if(enemyUnitManager.EnemyUnits[enemySelectIndex].Battler.HP<=0&&enemyUnitManager.EnemyUnits[enemySelectIndex].Battler.isDai==true)
+        {
+            yield return enemyUnitManager.EnemyUnits[enemySelectIndex].FadeBattleOver();
+            yield return DialogManager.Instance.TypeDialog($"{enemyUnitManager.EnemyUnits[enemySelectIndex].Battler.Name}を倒した！");
+            yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+            int enemyKill = enemyUnitManager.EnemyUnits.Count;
+            for (int j = 0; j < units.Count; j++)
+            {
+                if (units[j].Battler.Base.CharaTypes.Chara == CharaType.Enemy)
+                {
+                    Debug.Log(units[j].Battler.Base.Name + units[j].Battler.isDai);
+                    Debug.Log(enemyKill);
+                    enemyKill--;
+                }
+            }
+            if (enemyKill <= 0)
+            {
+                state = PatternState.BattleOver;
+                units[sourceIndex].Battler.OnBattleOver();
+                units[partnerIndex].Battler.OnBattleOver();
+            }
+        }
+
+
+        if (state == PatternState.BattleOver)
+        {
+
+            if (state == PatternState.BattleOver)
+            {
+                if (isPartner && !isDai)
+                {
+                    //倒した敵からその敵に設定しておいた経験値を得る
+                    for (int j = 0; j < enemyUnitManager.EnemyUnits.Count; j++)
+                    {
+                        sumExp += enemyUnitManager.EnemyUnits[j].Battler.Base.Exp;
+                        sumGold += enemyUnitManager.EnemyUnits[j].Battler.Base.Gold;
+                    }
+                    units[sourceIndex].Battler.HasExp += sumExp / 2;
+                    units[sourceIndex].Battler.HasExp += sumExp / 2;
+                    yield return DialogManager.Instance.TypeDialog($"{units[sourceIndex].Battler.Name}は{sumExp / 2}の経験値を獲得した");
+                    //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
+                    yield return OnLevelUp(units[sourceIndex]);
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    yield return DialogManager.Instance.TypeDialog($"{units[partnerIndex].Battler.Name}は{sumExp / 2}の経験値を獲得した");
+                    //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
+                    yield return OnLevelUp(units[partnerIndex]);
+                    //ゴールド獲得
+                    units[sourceIndex].Battler.Gold += sumGold;
+                    yield return DialogManager.Instance.TypeDialog($"{sumGold}G手に入れた");
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    //ドロップアイテム取得
+                    yield return DropItemCheck();
+                    BattleOver(true);
+                }
+                else
+                {
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    for (int j = 0; j < enemyUnitManager.EnemyUnits.Count; j++)
+                    {
+                        sumExp += enemyUnitManager.EnemyUnits[j].Battler.Base.Exp;
+                        sumGold += enemyUnitManager.EnemyUnits[j].Battler.Base.Gold;
+                    }
+                    units[sourceIndex].Battler.HasExp += sumExp;
+                    yield return DialogManager.Instance.TypeDialog($"{units[sourceIndex].Battler.Name}は{sumExp}の経験値を獲得した");
+                    //所持経験値がレベルアップに必要な経験値量を超えているなら必要経験値量を下回るまでレベルアップし続ける
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    yield return OnLevelUp(units[sourceIndex]);
+                    //ゴールド獲得
+                    units[sourceIndex].Battler.Gold += sumGold;
+                    yield return DialogManager.Instance.TypeDialog($"{sumGold}G手に入れた");
+                    yield return new WaitUntil(() => Input.GetKeyDown(KeyCode.Z));
+                    //ドロップアイテム取得
+                    yield return DropItemCheck();
+                    BattleOver(true);
+                }
+                for (int i = 0; i < units.Count; i++)
+                {
+                    if (units[i].Battler.Base.CharaTypes.Chara == CharaType.Enemy)
+                    {
+                        units[i].ResetAnimation();
+                    }
+                }
+            }
+
+        }
+
+
+    }
 
 }
